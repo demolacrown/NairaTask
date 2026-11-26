@@ -52,7 +52,80 @@ async function loadWithdrawals(){
   root.append(row);
  }
 }
-async function start(){try{const {data:{session}}=await db.auth.getSession();if(!session){throw new Error("No signed-in session. Open NairaTask through Telegram first.")}const access=await db.functions.invoke("admin-check");if(access.error)throw new Error(access.data?.error||"Could not verify administrator access.");if(!access.data?.isAdmin){throw new Error("Your NairaTask account is not yet registered as an administrator.")}$("loading").classList.add("hidden");$("console").classList.remove("hidden");await loadTasks();await loadBankDetails()}catch(e){$("loading").classList.add("hidden");$("denied").classList.remove("hidden");$("deniedText").textContent=e.message}}
+
+function clearAdCampaignForm(){
+ $("adCampaignForm").reset(); $("adCampaignId").value=""; $("adTitle").value="";
+ $("adDuration").value="60"; $("adReward").value="50"; $("adDailyLimit").value="5";
+ $("adDailyBudget").value="0"; $("adTotalBudget").value="0"; $("adStatus").value="draft";
+ $("adFormMessage").textContent=""; $("saveAdCampaign").textContent="Save campaign";
+ updateAdRewardLabel();
+}
+function updateAdRewardLabel(){
+ const daily=$("adCampaignType").value==="daily_reward";
+ $("adRewardLabel").firstChild.textContent=daily?"Reward paid by existing daily check-in (₦)":"Reward per completed ad (₦)";
+ $("adReward").disabled=daily;
+ if(daily)$("adReward").value="0"; else if(Number($("adReward").value)===0)$("adReward").value="50";
+}
+function editAdCampaign(c){
+ $("adCampaignId").value=c.id; $("adTitle").value=c.title; $("adDescription").value=c.description||"";
+ $("adCampaignType").value=c.campaign_type; $("adDuration").value=c.duration_seconds;
+ $("adReward").value=(Number(c.reward_kobo||0)/100).toString(); $("adDailyLimit").value=c.daily_limit;
+ $("adDailyBudget").value=(Number(c.daily_budget_kobo||0)/100).toString();
+ $("adTotalBudget").value=(Number(c.total_budget_kobo||0)/100).toString();
+ $("adPlacementId").value=c.provider_placement_id||""; $("adStatus").value=c.status==="active"?"paused":c.status;
+ $("adFormMessage").textContent="Active publishing is locked until provider verification is connected.";
+ $("saveAdCampaign").textContent="Update campaign"; updateAdRewardLabel();
+ window.scrollTo({top:0,behavior:"smooth"});
+}
+async function loadAdCampaigns(){
+ const data=await invoke({action:"list_ad_campaigns"});
+ const provider=data.provider||{};
+ const status=$("providerStatus");
+ status.textContent=provider.connection_status==="connected"?"Provider connected": "Provider not connected";
+ status.className="pill "+(provider.connection_status==="connected"?"published":"");
+ const rows=data.campaigns||[]; const root=$("adCampaignRows"); root.replaceChildren();
+ if(!rows.length){const p=document.createElement("p");p.className="muted";p.textContent="No ad campaigns yet. Create your first campaign above.";root.append(p);return;}
+ for(const c of rows){
+  const row=document.createElement("article");row.className="task-row";
+  const main=document.createElement("div");main.className="task-main";
+  const title=document.createElement("b");title.textContent=c.title;
+  const reward=c.campaign_type==="task"?"₦"+(Number(c.reward_kobo||0)/100).toLocaleString("en-NG")+" per completion":"Daily reward ad gate";
+  const meta=document.createElement("small");meta.textContent=reward+" · "+c.duration_seconds+" sec · "+c.daily_limit+"/user/day";
+  const budget=document.createElement("small");budget.textContent="Daily budget: "+(Number(c.daily_budget_kobo||0)>0?"₦"+(Number(c.daily_budget_kobo)/100).toLocaleString("en-NG"):"Not set")+" · Total: "+(Number(c.total_budget_kobo||0)>0?"₦"+(Number(c.total_budget_kobo)/100).toLocaleString("en-NG"):"Not set");
+  main.append(title,meta,budget);row.append(main);
+  const pill=document.createElement("span");pill.className="pill "+c.status;pill.textContent=c.status;row.append(pill);
+  const actions=document.createElement("div");actions.className="row-actions";
+  const edit=document.createElement("button");edit.textContent="Edit";edit.addEventListener("click",()=>editAdCampaign(c));actions.append(edit);
+  if(c.status!=="archived"){
+   const pause=document.createElement("button");pause.textContent=c.status==="paused"?"Set draft":"Pause";
+   pause.addEventListener("click",async()=>{try{await invoke({action:"update_ad_campaign_status",id:c.id,status:c.status==="paused"?"draft":"paused"});toast("Campaign status updated.");await loadAdCampaigns();}catch(e){toast(e.message)}});
+   const archive=document.createElement("button");archive.textContent="Archive";archive.addEventListener("click",async()=>{if(!window.confirm("Archive this ad campaign?"))return;try{await invoke({action:"update_ad_campaign_status",id:c.id,status:"archived"});toast("Campaign archived.");await loadAdCampaigns();}catch(e){toast(e.message)}});
+   actions.append(pause,archive);
+  }
+  row.append(actions);root.append(row);
+ }
+}
+$("adCampaignForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const type=$("adCampaignType").value;
+ const amount=(id)=>Math.round(Number($(id).value||0)*100);
+ const campaign={
+  title:$("adTitle").value.trim(),description:$("adDescription").value.trim(),
+  campaign_type:type,reward_kobo:type==="daily_reward"?0:amount("adReward"),
+  duration_seconds:Number($("adDuration").value),daily_limit:Number($("adDailyLimit").value),
+  daily_budget_kobo:amount("adDailyBudget"),total_budget_kobo:amount("adTotalBudget"),
+  provider_placement_id:$("adPlacementId").value.trim()||null,status:$("adStatus").value
+ };
+ const id=$("adCampaignId").value;
+ try{$("saveAdCampaign").disabled=true;const data=await invoke({action:"save_ad_campaign",id:id||undefined,campaign});$("adFormMessage").textContent="Saved successfully as "+data.campaign.status+".";toast(id?"Ad campaign updated.":"Ad campaign created.");clearAdCampaignForm();await loadAdCampaigns();}
+ catch(err){$("adFormMessage").textContent=err.message;toast(err.message);}
+ finally{$("saveAdCampaign").disabled=false;}
+});
+$("resetAdCampaign").addEventListener("click",clearAdCampaignForm);
+$("refreshAdCampaigns").addEventListener("click",()=>loadAdCampaigns().catch(e=>toast(e.message)));
+$("adCampaignType").addEventListener("change",updateAdRewardLabel);
+
+async function start(){try{const {data:{session}}=await db.auth.getSession();if(!session){throw new Error("No signed-in session. Open NairaTask through Telegram first.")}const access=await db.functions.invoke("admin-check");if(access.error)throw new Error(access.data?.error||"Could not verify administrator access.");if(!access.data?.isAdmin){throw new Error("Your NairaTask account is not yet registered as an administrator.")}$("loading").classList.add("hidden");$("console").classList.remove("hidden");await loadTasks();await loadBankDetails();await loadWithdrawals();await loadAdCampaigns()}catch(e){$("loading").classList.add("hidden");$("denied").classList.remove("hidden");$("deniedText").textContent=e.message}}
 $("taskForm").addEventListener("submit",async e=>{e.preventDefault();const reward=Number($("reward").value);if(!Number.isFinite(reward)||reward<0||reward>1000000){toast("Enter a valid reward amount.");return}const task={title:$("title").value.trim(),description:$("description").value.trim(),category:$("category").value,reward_kobo:Math.round(reward*100),destination_url:$("destination").value.trim()||null,proof_type:$("proofType").value,status:$("status").value,proof_instructions:$("proofInstructions").value.trim()||null,daily_limit:$("dailyLimit").value?Number($("dailyLimit").value):null,total_limit:$("totalLimit").value?Number($("totalLimit").value):null};const id=$("taskId").value;try{$("saveButton").disabled=true;await invoke(id?{action:"update_task",id,task}:{action:"create_task",task});$("formMessage").textContent="Saved successfully.";toast(id?"Task updated.":"Task created.");clearForm();await loadTasks()}catch(err){$("formMessage").textContent=err.message;toast(err.message)}finally{$("saveButton").disabled=false}});
 $("resetButton").addEventListener("click",clearForm);$("refreshButton").addEventListener("click",()=>loadTasks().catch(e=>toast(e.message)));start();
 $("refreshBankDetails")?.addEventListener("click",()=>loadBankDetails().catch(e=>toast(e.message)));
