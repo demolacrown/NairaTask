@@ -120,7 +120,7 @@ $("adCampaignForm").addEventListener("submit",async e=>{
   campaign_type:type,reward_kobo:type==="daily_reward"?0:amount("adReward"),
   daily_limit:Number($("adDailyLimit").value),
   daily_budget_kobo:amount("adDailyBudget"),total_budget_kobo:amount("adTotalBudget"),
-  provider_placement_id:null,status:$("adStatus").value
+status:$("adStatus").value
  };
  const id=$("adCampaignId").value;
  try{$("saveAdCampaign").disabled=true;const data=await invoke({action:"save_ad_campaign",id:id||undefined,campaign});$("adFormMessage").textContent="Saved successfully as "+data.campaign.status+".";toast(id?"Ad campaign updated.":"Ad campaign created.");clearAdCampaignForm();await loadAdCampaigns();}
