@@ -41,7 +41,7 @@ async function loadWithdrawals(){
   const bank=item.bank_details||{};
   const account=document.createElement("small");account.textContent=(bank.bank_name||item.bank_name||"Bank not set")+" · "+(bank.account_name||item.account_name||"")+" · "+(bank.account_number||("****"+(item.account_number_last4||"")));
   main.append(title,meta,account);row.append(main);
-  if(["pending","processing"].includes(item.status)){
+  if(["pending","approved","processing"].includes(item.status)){
    const actions=document.createElement("div");actions.className="row-actions";
    const paid=document.createElement("button");paid.textContent="Mark paid";
    paid.addEventListener("click",async()=>{if(!window.confirm("Confirm you have manually transferred this withdrawal?"))return;paid.disabled=true;try{await invoke({action:"update_withdrawal_status",id:item.id,status:"paid"});toast("Withdrawal marked paid.");await loadWithdrawals();}catch(e){toast(e.message);paid.disabled=false;}});
