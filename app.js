@@ -29,7 +29,7 @@ function loadAdsunSdk() {
 
 async function showAdsunRewardedAd(blockId) {
   const placementId = String(blockId || "").trim();
-  if (!/^\\d{1,80}$/.test(placementId)) {
+  if (!/^\d{1,80}$/.test(placementId)) {
     throw new Error("Ad placement is not configured yet.");
   }
   const ads = await loadAdsunSdk();
