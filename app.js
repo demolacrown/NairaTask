@@ -313,7 +313,6 @@ document.querySelectorAll("[data-page]").forEach((button) => {
     }
     if (page === "wallet") {
       $("walletPanel").scrollIntoView({ behavior: "smooth", block: "center" });
-      loadBankOptions();
       return;
     }
     const messages = {
@@ -323,33 +322,7 @@ document.querySelectorAll("[data-page]").forEach((button) => {
   });
 });
 
-let bankOptionsLoaded = false;
 let verifiedBankAccount = null;
-
-async function loadBankOptions() {
-  const select = $("bankSelect");
-  if (!select || bankOptionsLoaded) return;
-  select.innerHTML = '<option value="">Loading supported banks…</option>';
-  try {
-    const { data, error } = await supabaseClient.functions.invoke("paystack-bank-lookup", {
-      body: { action: "list_banks" }
-    });
-    if (error) throw error;
-    if (!data?.success || !Array.isArray(data.banks)) throw new Error(data?.message || "Bank list unavailable.");
-    select.innerHTML = '<option value="">Select your bank</option>';
-    data.banks.forEach((bank) => {
-      const option = document.createElement("option");
-      option.value = bank.code;
-      option.textContent = bank.name;
-      select.append(option);
-    });
-    bankOptionsLoaded = true;
-    $("bankVerifyNotice").textContent = "Select your bank and enter your 10-digit account number.";
-  } catch (error) {
-    select.innerHTML = '<option value="">Unable to load banks</option>';
-    $("bankVerifyNotice").textContent = error.message || "Bank list is not ready. Please try again later.";
-  }
-}
 
 $("accountNumber").addEventListener("input", () => {
   $("accountNumber").value = $("accountNumber").value.replace(/\D/g, "").slice(0, 10);
