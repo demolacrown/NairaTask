@@ -132,7 +132,8 @@ async function loadWallet() {
     maximumFractionDigits: 2
   });
   $("balanceAmount").textContent = money(data.available_kobo);
-  $("balanceNote").textContent = "Available balance · Pending: " + money(data.pending_kobo);\n  if ($("walletBalanceAmount")) { $("walletBalanceAmount").textContent = $("balanceAmount").textContent; $("walletBalanceNote").textContent = $("balanceNote").textContent; }
+  $("balanceNote").textContent = "Available balance · Pending: " + money(data.pending_kobo);
+  if ($("walletBalanceAmount")) { $("walletBalanceAmount").textContent = $("balanceAmount").textContent; $("walletBalanceNote").textContent = $("balanceNote").textContent; }
 }
 
 
@@ -316,7 +317,7 @@ document.querySelectorAll("[data-page]").forEach(button=>{
 });
 
 $("accountNumber").addEventListener("input",()=>{
-  $("accountNumber").value=$("accountNumber").value.replace(/\\D/g,"").slice(0,10);
+  $("accountNumber").value=$("accountNumber").value.replace(/\D/g,"").slice(0,10);
 });
 async function loadSavedBankDetails(){
   const {data:userResult}=await supabaseClient.auth.getUser();
@@ -339,10 +340,10 @@ $("bankDetailsForm").addEventListener("submit",async event=>{
   const button=$("saveBankDetails");
   const bankName=$("bankSelect").value;
   const accountNumber=$("accountNumber").value.trim();
-  const accountName=$("accountName").value.trim().replace(/\\s+/g," ");
+  const accountName=$("accountName").value.trim().replace(/\s+/g," ");
   const allowedBanks=["OPay","PalmPay","Moniepoint","MoMo PSB"];
   if(!allowedBanks.includes(bankName)){toast("Choose one of the four supported banks.");return;}
-  if(!/^\\d{10}$/.test(accountNumber)){toast("Enter a valid 10-digit account number.");return;}
+  if(!/^\d{10}$/.test(accountNumber)){toast("Enter a valid 10-digit account number.");return;}
   if(accountName.length<2){toast("Enter the account holder's full name.");return;}
   button.disabled=true;
   button.textContent="Submitting…";
