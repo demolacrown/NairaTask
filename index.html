@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#071b14"><title>NairaTask | Rewards</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="./styles.css?v=20261126-6"><script src="https://telegram.org/js/telegram-web-app.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script defer src="./app.js?v=20261126-6"></script></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#071b14"><title>NairaTask | Rewards</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="./styles.css?v=20261126-7"><script src="https://telegram.org/js/telegram-web-app.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script defer src="./app.js?v=20261126-7"></script></head>
 <body>
 <div id="splash" class="splash"><div class="brand-mark">N</div><div class="splash-wordmark">NAIRA<span>TASK</span></div><div class="loader"></div><p>YOUR REWARDS. YOUR PACE.</p></div>
 <div id="intro" class="intro hidden"><div class="intro-glow"></div><div class="intro-orbit orbit-one"></div><div class="intro-orbit orbit-two"></div><div class="intro-content"><div class="brand-mark intro-mark">N</div><div class="intro-wordmark">NAIRA<span>TASK</span></div><p>SMALL TASKS. REAL PROGRESS.</p><div class="intro-line"></div></div></div>
@@ -8,6 +8,10 @@
 <section class="page-view active" id="homePage" data-view="home">
   <section class="welcome"><div><p class="eyebrow">✨ YOUR REWARDS SPACE</p><h1>Welcome back, <span id="userName">there</span></h1><p class="muted" id="welcomeMessage">Complete tasks. Earn rewards.</p></div><div class="avatar" id="avatar">N</div></section>
   <section class="hero-card"><div class="hero-orb"></div><div class="hero-kicker">💚 YOUR NAIRATASK WALLET</div><p class="hero-label">AVAILABLE BALANCE</p><div class="balance-amount" id="balanceAmount">₦ —</div><p class="balance-note" id="balanceNote">Your wallet will appear after account setup.</p><div class="hero-actions"><button class="primary-button" data-page="wallet">Open wallet <span>↗</span></button><button class="glass-button" data-page="tasks">Explore tasks</button></div><div class="hero-sticker">💸</div></section>
+  <section class="earnings-grid" aria-label="Earnings breakdown">
+    <article class="earning-card task-earning"><span>🎯</span><small>MADE FROM TASKS</small><strong id="tasksEarnedAmount">₦0.00</strong><p>Approved task rewards</p></article>
+    <article class="earning-card referral-earning"><span>🎁</span><small>MADE FROM REFERRALS</small><strong id="referralEarnedAmount">₦0.00</strong><p id="referralEarnedNote">Includes pending rewards</p></article>
+  </section>
   <div class="home-section-head"><div><p class="eyebrow">🚀 GET STARTED</p><h2>Make today count</h2></div></div>
   <div class="home-shortcuts">
     <button class="shortcut-card" data-page="tasks"><span class="shortcut-emoji">🎯</span><b>Explore tasks</b><small>Find new ways to earn</small><span class="shortcut-arrow">↗</span></button>
@@ -37,6 +41,19 @@
 <section class="page-view" id="walletPage" data-view="wallet">
   <div class="page-intro"><span class="page-sticker">💳</span><p class="eyebrow">YOUR MONEY, YOUR DETAILS</p><h1>Wallet &amp; payouts</h1><p>Save your bank details once. Admins will use them when processing approved payouts.</p></div>
   <section class="wallet-balance-card"><p class="eyebrow">AVAILABLE BALANCE</p><strong id="walletBalanceAmount">₦ —</strong><p id="walletBalanceNote">Your wallet summary appears here.</p></section>
+  <section class="withdrawal-panel">
+    <div class="section-heading"><div><p class="eyebrow">💸 CASH OUT</p><h2>Withdraw your earnings</h2></div><span class="secure-pill">MANUAL PAYOUT</span></div>
+    <p class="muted">Choose where your money came from. Each source has a separate minimum and balance.</p>
+    <div class="withdraw-option">
+      <div class="withdraw-option-head"><div><b>🎯 Task earnings</b><small>Minimum withdrawal: <strong>₦500</strong></small></div><span id="tasksWithdrawAvailable">Available: ₦0.00</span></div>
+      <form id="tasksWithdrawForm" data-source="tasks"><label for="tasksWithdrawAmount">Amount to withdraw (₦)</label><input id="tasksWithdrawAmount" type="number" min="500" step="0.01" placeholder="Enter amount (minimum ₦500)" required><button class="primary-button" type="submit">Request task withdrawal →</button><p class="inline-notice" id="tasksWithdrawNotice">Checking your task withdrawal eligibility…</p></form>
+    </div>
+    <div class="withdraw-option">
+      <div class="withdraw-option-head"><div><b>🎁 Referral earnings</b><small>Minimum withdrawal: <strong>₦1,000</strong></small></div><span id="referralWithdrawAvailable">Available: ₦0.00</span></div>
+      <form id="referralWithdrawForm" data-source="referral"><label for="referralWithdrawAmount">Amount to withdraw (₦)</label><input id="referralWithdrawAmount" type="number" min="1000" step="0.01" placeholder="Enter amount (minimum ₦1,000)" required><button class="primary-button" type="submit">Request referral withdrawal →</button><p class="inline-notice" id="referralWithdrawNotice">Checking your referral withdrawal eligibility…</p></form>
+    </div>
+    <div class="bank-review-note">🛡️ <span><b>How withdrawals work</b><br>Requests are checked against the selected earnings source and sent to the admin team. Payouts are handled manually after review. Referral rewards count only after they are approved and released.</span></div>
+  </section>
   <section class="wallet-panel">
     <div class="section-heading"><div><p class="eyebrow">BANK ACCOUNT SETUP</p><h2>🏦 Your payout details</h2></div><span class="secure-pill">🔒 PRIVATE</span></div>
     <p class="muted">Enter the account name exactly as registered with your bank. Your details will be saved securely and sent to the admin team for review.</p>
