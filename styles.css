@@ -9,3 +9,17 @@
 .referral-code-wrap{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#f6f8fb;border:1px dashed #cfd9e4;border-radius:12px;padding:12px;margin-top:15px}.referral-code-wrap small{display:block;font-size:8px;color:var(--muted);font-weight:700;letter-spacing:.7px}.referral-code-wrap strong{display:block;font-size:17px;letter-spacing:1.5px;color:var(--navy);margin-top:3px}.referral-code-wrap button{background:var(--navy);color:#fff;border-radius:9px;padding:10px 12px;font-size:10px;font-weight:700;white-space:nowrap}
 .referral-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.referral-stats div{background:#f8fafc;border-radius:11px;padding:10px 7px;text-align:center}.referral-stats strong{display:block;font-size:17px;color:var(--navy)}.referral-stats small{display:block;font-size:8px;color:var(--muted);margin-top:2px}
 .referral-apply{border-top:1px solid var(--line);padding-top:12px}.referral-apply>b{font-size:11px;color:var(--ink)}.referral-footnote{font-size:9px;line-height:1.5;color:#8a96a6;margin:10px 0 0}
+
+
+/* Bank account verification */
+.wallet-panel{margin:18px 0;padding:20px;background:var(--card,#fff);border:1px solid rgba(120,140,160,.18);border-radius:20px;box-shadow:0 8px 28px rgba(16,27,44,.05)}
+.wallet-panel .section-heading{margin:0 0 10px}
+.wallet-panel>label{display:block;margin:16px 0 7px;font-size:13px;font-weight:700;color:var(--text,#172337)}
+.wallet-panel select,.wallet-panel input{width:100%;min-height:48px;padding:12px 14px;border:1px solid rgba(120,140,160,.28);border-radius:12px;background:var(--surface,#fff);color:var(--text,#172337);font:inherit;outline:none}
+.wallet-panel select:focus,.wallet-panel input:focus{border-color:#3978d6;box-shadow:0 0 0 3px rgba(57,120,214,.12)}
+.wallet-panel #verifyBankAccount{width:100%;margin-top:16px}
+.wallet-panel #verifyBankAccount:disabled{opacity:.55;cursor:not-allowed}
+.account-verified{display:grid;gap:8px;margin-top:16px;padding:15px;border-radius:14px;background:rgba(25,160,100,.08);border:1px solid rgba(25,160,100,.25)}
+.account-verified strong{font-size:17px;letter-spacing:.02em}
+.account-verified small,.wallet-footnote{color:var(--muted,#68778b);font-size:12px}
+.wallet-footnote{margin:14px 0 0;line-height:1.5}
