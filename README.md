@@ -38,3 +38,14 @@ A database trigger named `on_auth_user_created_nairatask` invokes `public.handle
 
 ## Deploy
 The existing Cloudflare Pages project `nairatask` was created using Direct Upload and remains at https://nairatask.pages.dev. The repository includes a GitHub Actions workflow at `.github/workflows/deploy-cloudflare.yml` that deploys the repository root to this existing Pages project on pushes to `main`. It requires the GitHub Actions repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+
+
+## Referral programme
+- Every profile receives a unique `NT` referral code.
+- A signed-in invitee can apply a code once; self-referrals are rejected.
+- Only the inviter is eligible for the ₦100 reward.
+- Qualification requires five approved task submissions in the `rewarded_ad` category.
+- On qualification, ₦100 is recorded as a pending wallet transaction. It is not added to available balance until the associated advertising revenue is verified and an administrator settles it.
+- Referral attribution is handled by the authenticated `register_referral` database function. The Homepage displays the user's code and referral counts.
+- Automatic attribution from Telegram deep links is supported when Telegram provides a `start_param` beginning with `ref_`; invitees can also enter a code manually.
+- Real ad-view verification must come from the approved ad provider's server callback. A client-side timer or self-reported completion must never qualify a referral.
