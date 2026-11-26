@@ -21,7 +21,7 @@ A database trigger named on_auth_user_created_nairatask now invokes public.handl
 - Branded loading splash and responsive Homepage.
 - Telegram Mini App identity verification call.
 - Published task list read from public.tasks.
-- Promo, daily reward, referral and wallet controls are present as UI, but account-specific actions remain locked until a secure Supabase user session is implemented.
+- The frontend attempts Telegram verification and Supabase session creation. Wallet balance loading is implemented. Promo redemption, daily reward claims, referral workflows, task submissions and withdrawals are not yet fully implemented.
 - Withdrawals are disabled in the existing app_settings.withdrawal_rules configuration. No payout flow is implemented.
 - No fake balances or fabricated task records are shown.
 
@@ -33,4 +33,4 @@ A database trigger named on_auth_user_created_nairatask now invokes public.handl
 - Real-money payout integration must remain disabled until the operator has the required legal, age and payment-provider arrangements.
 
 ## Deploy
-Use Cloudflare Pages with this repository's root directory as the build output. No build command is required for the static frontend.
+Use Cloudflare Pages connected to `demolacrown/NairaTask`, production branch `main`, root directory `/`, no build command, and output directory `/`. Confirm the Pages project is linked to this exact repository and branch. CSS and JS asset URLs are versioned to reduce stale browser-cache issues.
