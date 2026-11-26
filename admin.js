@@ -64,7 +64,7 @@ function updateAdRewardLabel(){
  const daily=$("adCampaignType").value==="daily_reward";
  $("adRewardLabel").firstChild.textContent=daily?"Reward paid by existing daily check-in (₦)":"Reward per completed ad (₦)";
  $("adReward").disabled=daily;
- if(daily)$("adReward").value="0"; else if(Number($("adReward").value)===0)$("adReward").value="50";
+ if(daily){$("adReward").value="0";$("adDailyLimit").value="1";$("adDailyLimit").disabled=true;} else {$("adDailyLimit").disabled=false;if(Number($("adReward").value)===0)$("adReward").value="50";if(Number($("adDailyLimit").value)===1)$("adDailyLimit").value="5";}
 }
 function editAdCampaign(c){
  $("adCampaignId").value=c.id; $("adTitle").value=c.title; $("adDescription").value=c.description||"";
@@ -72,7 +72,7 @@ function editAdCampaign(c){
  $("adReward").value=(Number(c.reward_kobo||0)/100).toString(); $("adDailyLimit").value=c.daily_limit;
  $("adDailyBudget").value=(Number(c.daily_budget_kobo||0)/100).toString();
  $("adTotalBudget").value=(Number(c.total_budget_kobo||0)/100).toString();
- $("adPlacementId").value=c.provider_placement_id||""; $("adStatus").value=c.status==="active"?"paused":c.status;
+ $("adStatus").value=c.status;
  $("adFormMessage").textContent="Active publishing is locked until provider verification is connected.";
  $("saveAdCampaign").textContent="Update campaign"; updateAdRewardLabel();
  window.scrollTo({top:0,behavior:"smooth"});
@@ -81,8 +81,14 @@ async function loadAdCampaigns(){
  const data=await invoke({action:"list_ad_campaigns"});
  const provider=data.provider||{};
  const status=$("providerStatus");
- status.textContent=provider.connection_status==="connected"?"Provider connected": "Provider not connected";
+ status.textContent=provider.connection_status==="connected"?"Monetag connected":provider.connection_status==="pending"?"Monetag setup pending":"Monetag not connected";
  status.className="pill "+(provider.connection_status==="connected"?"published":"");
+ $("monetagPublisherRef").value=provider.publisher_reference||"";
+ $("monetagZoneId").value=provider.sdk_zone_id||"";
+ $("monetagScriptUrl").value=provider.sdk_script_url||"";
+ $("monetagSetupStatus").textContent=provider.connection_status||"not_connected";
+ $("monetagSetupStatus").className="pill "+(provider.connection_status==="connected"?"published":"");
+ $("activateMonetag").disabled=!(provider.sdk_zone_id&&provider.sdk_script_url)||provider.connection_status==="connected";
  const rows=data.campaigns||[]; const root=$("adCampaignRows"); root.replaceChildren();
  if(!rows.length){const p=document.createElement("p");p.className="muted";p.textContent="No ad campaigns yet. Create your first campaign above.";root.append(p);return;}
  for(const c of rows){
@@ -97,8 +103,8 @@ async function loadAdCampaigns(){
   const actions=document.createElement("div");actions.className="row-actions";
   const edit=document.createElement("button");edit.textContent="Edit";edit.addEventListener("click",()=>editAdCampaign(c));actions.append(edit);
   if(c.status!=="archived"){
-   const pause=document.createElement("button");pause.textContent=c.status==="paused"?"Set draft":"Pause";
-   pause.addEventListener("click",async()=>{try{await invoke({action:"update_ad_campaign_status",id:c.id,status:c.status==="paused"?"draft":"paused"});toast("Campaign status updated.");await loadAdCampaigns();}catch(e){toast(e.message)}});
+   const pause=document.createElement("button");pause.textContent=c.status==="active"?"Pause":"Activate";
+   pause.addEventListener("click",async()=>{try{await invoke({action:"update_ad_campaign_status",id:c.id,status:c.status==="active"?"paused":"active"});toast("Campaign status updated.");await loadAdCampaigns();}catch(e){toast(e.message)}});
    const archive=document.createElement("button");archive.textContent="Archive";archive.addEventListener("click",async()=>{if(!window.confirm("Archive this ad campaign?"))return;try{await invoke({action:"update_ad_campaign_status",id:c.id,status:"archived"});toast("Campaign archived.");await loadAdCampaigns();}catch(e){toast(e.message)}});
    actions.append(pause,archive);
   }
@@ -114,12 +120,33 @@ $("adCampaignForm").addEventListener("submit",async e=>{
   campaign_type:type,reward_kobo:type==="daily_reward"?0:amount("adReward"),
   daily_limit:Number($("adDailyLimit").value),
   daily_budget_kobo:amount("adDailyBudget"),total_budget_kobo:amount("adTotalBudget"),
-  provider_placement_id:$("adPlacementId").value.trim()||null,status:$("adStatus").value
+  provider_placement_id:null,status:$("adStatus").value
  };
  const id=$("adCampaignId").value;
  try{$("saveAdCampaign").disabled=true;const data=await invoke({action:"save_ad_campaign",id:id||undefined,campaign});$("adFormMessage").textContent="Saved successfully as "+data.campaign.status+".";toast(id?"Ad campaign updated.":"Ad campaign created.");clearAdCampaignForm();await loadAdCampaigns();}
  catch(err){$("adFormMessage").textContent=err.message;toast(err.message);}
  finally{$("saveAdCampaign").disabled=false;}
+});
+$("monetagSettingsForm").addEventListener("submit",async e=>{
+ e.preventDefault();
+ const button=$("saveMonetagSettings");button.disabled=true;
+ try{
+  const data=await invoke({action:"save_monetag_settings",settings:{
+   publisher_reference:$("monetagPublisherRef").value.trim(),
+   sdk_zone_id:$("monetagZoneId").value.trim(),
+   sdk_script_url:$("monetagScriptUrl").value.trim()
+  }});
+  $("monetagSetupStatus").textContent=data.provider.connection_status;
+  toast("Monetag settings saved. Configure the postback before activation.");
+  await loadAdCampaigns();
+ }catch(error){toast(error.message);}
+ finally{button.disabled=false;}
+});
+$("activateMonetag").addEventListener("click",async()=>{
+ if(!window.confirm("Have you saved MONETAG_POSTBACK_SECRET in Supabase Edge Function secrets and configured the Monetag postback URL? Continue only if both are complete."))return;
+ const button=$("activateMonetag");button.disabled=true;
+ try{await invoke({action:"activate_monetag"});toast("Monetag connection marked active.");await loadAdCampaigns();}
+ catch(error){toast(error.message);button.disabled=false;}
 });
 $("resetAdCampaign").addEventListener("click",clearAdCampaignForm);
 $("refreshAdCampaigns").addEventListener("click",()=>loadAdCampaigns().catch(e=>toast(e.message)));
