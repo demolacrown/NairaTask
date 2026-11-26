@@ -311,12 +311,83 @@ document.querySelectorAll("[data-page]").forEach((button) => {
       loadReferralSummary();
       return;
     }
+    if (page === "wallet") {
+      $("walletPanel").scrollIntoView({ behavior: "smooth", block: "center" });
+      loadBankOptions();
+      return;
+    }
     const messages = {
-      tasks: "The published task list is shown on your Homepage.",
-      wallet: "Your available wallet balance is shown above. Full wallet history is coming next."
+      tasks: "The published task list is shown on your Homepage."
     };
     toast(messages[page] || "This section is not available yet.");
   });
+});
+
+let bankOptionsLoaded = false;
+let verifiedBankAccount = null;
+
+async function loadBankOptions() {
+  const select = $("bankSelect");
+  if (!select || bankOptionsLoaded) return;
+  select.innerHTML = '<option value="">Loading supported banks…</option>';
+  try {
+    const { data, error } = await supabaseClient.functions.invoke("paystack-bank-lookup", {
+      body: { action: "list_banks" }
+    });
+    if (error) throw error;
+    if (!data?.success || !Array.isArray(data.banks)) throw new Error(data?.message || "Bank list unavailable.");
+    select.innerHTML = '<option value="">Select your bank</option>';
+    data.banks.forEach((bank) => {
+      const option = document.createElement("option");
+      option.value = bank.code;
+      option.textContent = bank.name;
+      select.append(option);
+    });
+    bankOptionsLoaded = true;
+    $("bankVerifyNotice").textContent = "Select your bank and enter your 10-digit account number.";
+  } catch (error) {
+    select.innerHTML = '<option value="">Unable to load banks</option>';
+    $("bankVerifyNotice").textContent = error.message || "Bank list is not ready. Please try again later.";
+  }
+}
+
+$("accountNumber").addEventListener("input", () => {
+  $("accountNumber").value = $("accountNumber").value.replace(/\\D/g, "").slice(0, 10);
+  verifiedBankAccount = null;
+  $("verifiedAccount").classList.add("hidden");
+  $("verifyBankAccount").disabled = !($("bankSelect").value && $("accountNumber").value.length === 10);
+});
+$("bankSelect").addEventListener("change", () => {
+  verifiedBankAccount = null;
+  $("verifiedAccount").classList.add("hidden");
+  $("verifyBankAccount").disabled = !($("bankSelect").value && $("accountNumber").value.length === 10);
+});
+$("verifyBankAccount").addEventListener("click", async () => {
+  const button = $("verifyBankAccount");
+  const bankCode = $("bankSelect").value;
+  const accountNumber = $("accountNumber").value.trim();
+  if (!bankCode || !/^\\d{10}$/.test(accountNumber)) return;
+  button.disabled = true;
+  button.textContent = "Verifying…";
+  $("bankVerifyNotice").textContent = "Checking the account with the bank verification provider…";
+  $("verifiedAccount").classList.add("hidden");
+  try {
+    const { data, error } = await supabaseClient.functions.invoke("paystack-bank-lookup", {
+      body: { action: "resolve_account", bank_code: bankCode, account_number: accountNumber }
+    });
+    if (error) throw error;
+    if (!data?.success || !data.account_name) throw new Error(data?.message || "Account could not be verified.");
+    verifiedBankAccount = { bank_code: bankCode, account_number: data.account_number, account_name: data.account_name };
+    $("verifiedAccountName").textContent = data.account_name;
+    $("verifiedAccountNumber").textContent = "Account ending " + data.account_number.slice(-4);
+    $("verifiedAccount").classList.remove("hidden");
+    $("bankVerifyNotice").textContent = "Account name verified. Please check it carefully before requesting a withdrawal.";
+  } catch (error) {
+    $("bankVerifyNotice").textContent = error.message || "Unable to verify this account. Check the details and try again.";
+  } finally {
+    button.textContent = "Verify account name";
+    button.disabled = !($("bankSelect").value && $("accountNumber").value.length === 10);
+  }
 });
 
 $("dailyRewardButton").addEventListener("click", async () => {
