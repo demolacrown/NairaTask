@@ -132,7 +132,7 @@ async function loadWallet() {
     maximumFractionDigits: 2
   });
   $("balanceAmount").textContent = money(data.available_kobo);
-  $("balanceNote").textContent = "Available balance · Pending: " + money(data.pending_kobo);
+  $("balanceNote").textContent = "Available balance · Pending: " + money(data.pending_kobo);\n  if ($("walletBalanceAmount")) { $("walletBalanceAmount").textContent = $("balanceAmount").textContent; $("walletBalanceNote").textContent = $("balanceNote").textContent; }
 }
 
 
@@ -299,68 +299,70 @@ async function loadTasks() {
   }
 }
 
-document.querySelectorAll("[data-page]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const page = button.dataset.page;
-    if (page === "home") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    if (page === "invite") {
-      $("referralPanel").scrollIntoView({ behavior: "smooth", block: "center" });
-      loadReferralSummary();
-      return;
-    }
-    if (page === "wallet") {
-      $("walletPanel").scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-    const messages = {
-      tasks: "The published task list is shown on your Homepage."
-    };
-    toast(messages[page] || "This section is not available yet.");
+function showPage(page){
+  const allowed=["home","tasks","invite","wallet"];
+  const target=allowed.includes(page)?page:"home";
+  document.querySelectorAll(".page-view").forEach(el=>el.classList.toggle("active",el.dataset.view===target));
+  document.querySelectorAll(".nav-item").forEach(el=>el.classList.toggle("active",el.dataset.page===target));
+  window.scrollTo({top:0,behavior:"smooth"});
+  if(target==="invite") loadReferralSummary();
+  if(target==="wallet"){loadWallet();loadSavedBankDetails();}
+}
+document.querySelectorAll("[data-page]").forEach(button=>{
+  button.addEventListener("click",event=>{
+    event.preventDefault();
+    showPage(button.dataset.page);
   });
 });
 
-let verifiedBankAccount = null;
-
-$("accountNumber").addEventListener("input", () => {
-  $("accountNumber").value = $("accountNumber").value.replace(/\D/g, "").slice(0, 10);
-  verifiedBankAccount = null;
-  $("verifiedAccount").classList.add("hidden");
-  $("verifyBankAccount").disabled = !($("bankSelect").value && $("accountNumber").value.length === 10);
+$("accountNumber").addEventListener("input",()=>{
+  $("accountNumber").value=$("accountNumber").value.replace(/\\D/g,"").slice(0,10);
 });
-$("bankSelect").addEventListener("change", () => {
-  verifiedBankAccount = null;
-  $("verifiedAccount").classList.add("hidden");
-  $("verifyBankAccount").disabled = !($("bankSelect").value && $("accountNumber").value.length === 10);
-});
-$("verifyBankAccount").addEventListener("click", async () => {
-  const button = $("verifyBankAccount");
-  const bankCode = $("bankSelect").value;
-  const accountNumber = $("accountNumber").value.trim();
-  if (!bankCode || !/^\d{10}$/.test(accountNumber)) return;
-  button.disabled = true;
-  button.textContent = "Verifying…";
-  $("bankVerifyNotice").textContent = "Checking the account with the bank verification provider…";
-  $("verifiedAccount").classList.add("hidden");
-  try {
-    const { data, error } = await supabaseClient.functions.invoke("paystack-bank-lookup", {
-      body: { action: "resolve_account", bank_code: bankCode, account_number: accountNumber }
-    });
-    if (error) throw error;
-    if (!data?.success || !data.account_name) throw new Error(data?.message || "Account could not be verified.");
-    verifiedBankAccount = { bank_code: bankCode, account_number: data.account_number, account_name: data.account_name };
-    $("verifiedAccountName").textContent = data.account_name;
-    $("verifiedAccountNumber").textContent = "Account ending " + data.account_number.slice(-4);
-    $("verifiedAccount").classList.remove("hidden");
-    $("bankVerifyNotice").textContent = "Account name verified. Please check it carefully before requesting a withdrawal.";
-  } catch (error) {
-    $("bankVerifyNotice").textContent = error.message || "Unable to verify this account. Check the details and try again.";
-  } finally {
-    button.textContent = "Verify account name";
-    button.disabled = !($("bankSelect").value && $("accountNumber").value.length === 10);
-  }
+async function loadSavedBankDetails(){
+  const {data:userResult}=await supabaseClient.auth.getUser();
+  if(!userResult.user)return;
+  const {data,error}=await supabaseClient.from("user_bank_details")
+    .select("bank_name,account_number,account_name,review_status,submitted_at")
+    .eq("user_id",userResult.user.id).maybeSingle();
+  if(error){$("bankDetailsNotice").textContent="Could not load saved bank details. Please retry.";return;}
+  if(!data){$("bankDetailsNotice").textContent="No bank details submitted yet.";return;}
+  $("bankSelect").value=data.bank_name;
+  $("accountNumber").value=data.account_number;
+  $("accountName").value=data.account_name;
+  $("bankDetailsNotice").textContent=data.review_status==="reviewed"
+    ?"Your bank details have been reviewed by the admin team."
+    :"Your bank details have been submitted and are waiting for admin review.";
+  $("saveBankDetails").innerHTML="Update bank details <span>→</span>";
+}
+$("bankDetailsForm").addEventListener("submit",async event=>{
+  event.preventDefault();
+  const button=$("saveBankDetails");
+  const bankName=$("bankSelect").value;
+  const accountNumber=$("accountNumber").value.trim();
+  const accountName=$("accountName").value.trim().replace(/\\s+/g," ");
+  const allowedBanks=["OPay","PalmPay","Moniepoint","MoMo PSB"];
+  if(!allowedBanks.includes(bankName)){toast("Choose one of the four supported banks.");return;}
+  if(!/^\\d{10}$/.test(accountNumber)){toast("Enter a valid 10-digit account number.");return;}
+  if(accountName.length<2){toast("Enter the account holder's full name.");return;}
+  button.disabled=true;
+  button.textContent="Submitting…";
+  $("bankDetailsNotice").textContent="Saving your bank details securely…";
+  try{
+    const {data:userResult,error:userError}=await supabaseClient.auth.getUser();
+    if(userError||!userResult.user)throw new Error("Sign in through Telegram before submitting bank details.");
+    const {error}=await supabaseClient.from("user_bank_details").upsert({
+      user_id:userResult.user.id,bank_name:bankName,account_number:accountNumber,
+      account_name:accountName,review_status:"submitted",submitted_at:new Date().toISOString(),
+      updated_at:new Date().toISOString()
+    },{onConflict:"user_id"});
+    if(error)throw error;
+    $("bankDetailsNotice").textContent="Submitted successfully. Your bank details are now waiting for admin review.";
+    button.innerHTML="Update bank details <span>→</span>";
+    toast("Bank details submitted for review.");
+  }catch(error){
+    $("bankDetailsNotice").textContent=error.message||"Unable to submit bank details. Please try again.";
+    toast(error.message||"Submission failed.");
+  }finally{button.disabled=false;}
 });
 
 $("dailyRewardButton").addEventListener("click", async () => {
@@ -422,13 +424,15 @@ $("promoInput").addEventListener("input", (event) => {
   const tg = window.Telegram && window.Telegram.WebApp;
   if (tg) {
     try {
-      tg.setHeaderColor("#101b2c");
-      tg.setBackgroundColor("#f4f7fb");
+      tg.setHeaderColor("#071b14");
+      tg.setBackgroundColor("#071b14");
     } catch (_) {}
   }
 
   await verifyTelegram();
   await loadTasks();
   await loadReferralSummary();
+  $("walletBalanceAmount").textContent=$("balanceAmount").textContent;
+  $("walletBalanceNote").textContent=$("balanceNote").textContent;
   setTimeout(playIntro, 350);
 })();
