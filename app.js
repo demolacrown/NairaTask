@@ -200,6 +200,7 @@ async function loadWallet() {
   if (error || !data) {
     $("balanceAmount").textContent = "₦ —";
     $("balanceNote").textContent = "Wallet is being prepared.";
+    await loadEarningsSummary();
     return;
   }
   const money = (kobo) => "₦" + (Number(kobo || 0) / 100).toLocaleString("en-NG", {
