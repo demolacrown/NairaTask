@@ -143,12 +143,34 @@ async function loadReferralSummary() {
     $("referralNotice").textContent = "Open NairaTask through Telegram to load your personal invite code.";
     return;
   }
-  $("referralCode").textContent = data.referral_code || "Not available";
+  const code = data.referral_code || "";
+  $("referralCode").textContent = code || "Not available";
+  const referralLink = code ? `https://t.me/NairaTaskRewardsBot?startapp=ref_${encodeURIComponent(code)}` : "";
+  const linkField = $("referralLink");
+  if (linkField) linkField.value = referralLink;
+  const linkButton = $("copyReferralLink");
+  if (linkButton) linkButton.disabled = !referralLink;
   $("referralTotal").textContent = Number(data.total_invites || 0);
   $("referralPending").textContent = Number(data.pending_invites || 0);
   $("referralQualified").textContent = Number(data.qualified_invites || 0);
   $("referralNotice").textContent = "Reward: ₦100 to the inviter only, after five approved rewarded-ad tasks. Rewards remain pending until ad revenue is verified.";
 }
+
+$("copyReferralLink")?.addEventListener("click", async () => {
+  const link = $("referralLink")?.value?.trim();
+  if (!link) {
+    toast("Your referral link is not ready yet.");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(link);
+    toast("Referral link copied. Share it with your friends.");
+  } catch (_) {
+    $("referralLink").focus();
+    $("referralLink").select();
+    toast("Select and copy your referral link.");
+  }
+});
 
 $("copyReferralCode").addEventListener("click", async () => {
   const code = $("referralCode").textContent.trim();
