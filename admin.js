@@ -55,7 +55,7 @@ async function loadWithdrawals(){
 
 function clearAdCampaignForm(){
  $("adCampaignForm").reset(); $("adCampaignId").value=""; $("adTitle").value="";
- $("adDuration").value="60"; $("adReward").value="50"; $("adDailyLimit").value="5";
+ $("adReward").value="50"; $("adDailyLimit").value="5";
  $("adDailyBudget").value="0"; $("adTotalBudget").value="0"; $("adStatus").value="draft";
  $("adFormMessage").textContent=""; $("saveAdCampaign").textContent="Save campaign";
  updateAdRewardLabel();
@@ -68,7 +68,7 @@ function updateAdRewardLabel(){
 }
 function editAdCampaign(c){
  $("adCampaignId").value=c.id; $("adTitle").value=c.title; $("adDescription").value=c.description||"";
- $("adCampaignType").value=c.campaign_type; $("adDuration").value=c.duration_seconds;
+ $("adCampaignType").value=c.campaign_type;
  $("adReward").value=(Number(c.reward_kobo||0)/100).toString(); $("adDailyLimit").value=c.daily_limit;
  $("adDailyBudget").value=(Number(c.daily_budget_kobo||0)/100).toString();
  $("adTotalBudget").value=(Number(c.total_budget_kobo||0)/100).toString();
@@ -90,7 +90,7 @@ async function loadAdCampaigns(){
   const main=document.createElement("div");main.className="task-main";
   const title=document.createElement("b");title.textContent=c.title;
   const reward=c.campaign_type==="task"?"₦"+(Number(c.reward_kobo||0)/100).toLocaleString("en-NG")+" per completion":"Daily reward ad gate";
-  const meta=document.createElement("small");meta.textContent=reward+" · "+c.duration_seconds+" sec · "+c.daily_limit+"/user/day";
+  const meta=document.createElement("small");meta.textContent=reward+" · "+c.daily_limit+" ads/user/day";
   const budget=document.createElement("small");budget.textContent="Daily budget: "+(Number(c.daily_budget_kobo||0)>0?"₦"+(Number(c.daily_budget_kobo)/100).toLocaleString("en-NG"):"Not set")+" · Total: "+(Number(c.total_budget_kobo||0)>0?"₦"+(Number(c.total_budget_kobo)/100).toLocaleString("en-NG"):"Not set");
   main.append(title,meta,budget);row.append(main);
   const pill=document.createElement("span");pill.className="pill "+c.status;pill.textContent=c.status;row.append(pill);
@@ -112,7 +112,7 @@ $("adCampaignForm").addEventListener("submit",async e=>{
  const campaign={
   title:$("adTitle").value.trim(),description:$("adDescription").value.trim(),
   campaign_type:type,reward_kobo:type==="daily_reward"?0:amount("adReward"),
-  duration_seconds:Number($("adDuration").value),daily_limit:Number($("adDailyLimit").value),
+  daily_limit:Number($("adDailyLimit").value),
   daily_budget_kobo:amount("adDailyBudget"),total_budget_kobo:amount("adTotalBudget"),
   provider_placement_id:$("adPlacementId").value.trim()||null,status:$("adStatus").value
  };
