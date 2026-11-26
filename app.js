@@ -114,6 +114,81 @@ async function verifyTelegram() {
   }
 }
 
+
+let earningsSummary = null;
+const formatNaira = (kobo) => "₦" + (Number(kobo || 0) / 100).toLocaleString("en-NG", {minimumFractionDigits:2,maximumFractionDigits:2});
+
+async function loadEarningsSummary() {
+  const { data, error } = await supabaseClient.rpc("get_my_earnings_summary");
+  if (error || !data) {
+    ["tasksEarnedAmount","referralEarnedAmount","tasksWithdrawAvailable","referralWithdrawAvailable"].forEach(id => { if ($(id)) $(id).textContent = "—"; });
+    return;
+  }
+  earningsSummary = data;
+  if ($("tasksEarnedAmount")) $("tasksEarnedAmount").textContent = formatNaira(data.tasks_earned_kobo);
+  if ($("referralEarnedAmount")) $("referralEarnedAmount").textContent = formatNaira(data.referral_earned_kobo);
+  if ($("referralEarnedNote")) $("referralEarnedNote").textContent = Number(data.referral_earned_kobo) > Number(data.referral_available_kobo)
+    ? "Some rewards may still be pending or reserved" : "Approved referral rewards";
+  if ($("tasksWithdrawAvailable")) $("tasksWithdrawAvailable").textContent = "Available: " + formatNaira(data.tasks_available_kobo);
+  if ($("referralWithdrawAvailable")) $("referralWithdrawAvailable").textContent = "Available: " + formatNaira(data.referral_available_kobo);
+  updateWithdrawalEligibility("tasks");
+  updateWithdrawalEligibility("referral");
+}
+
+function updateWithdrawalEligibility(source) {
+  if (!earningsSummary) return;
+  const isTasks = source === "tasks";
+  const amountInput = $(isTasks ? "tasksWithdrawAmount" : "referralWithdrawAmount");
+  const notice = $(isTasks ? "tasksWithdrawNotice" : "referralWithdrawNotice");
+  if (!amountInput || !notice) return;
+  const available = Number(isTasks ? earningsSummary.tasks_available_kobo : earningsSummary.referral_available_kobo);
+  const minimum = Number(isTasks ? earningsSummary.tasks_minimum_kobo : earningsSummary.referral_minimum_kobo);
+  const amount = Math.round(Number(amountInput.value || 0) * 100);
+  if (available < minimum) {
+    notice.textContent = "Not eligible yet. You need at least " + formatNaira(minimum) + "; currently available: " + formatNaira(available) + ".";
+  } else if (!amount) {
+    notice.textContent = "You are eligible. Enter an amount from " + formatNaira(minimum) + " up to " + formatNaira(available) + ".";
+  } else if (amount < minimum) {
+    notice.textContent = "Amount is below the minimum of " + formatNaira(minimum) + ".";
+  } else if (amount > available) {
+    notice.textContent = "Insufficient " + source + " balance. Available: " + formatNaira(available) + ".";
+  } else {
+    notice.textContent = "Eligible to request " + formatNaira(amount) + " from " + source + ".";
+  }
+}
+
+async function submitSourceWithdrawal(source, event) {
+  event.preventDefault();
+  const isTasks = source === "tasks";
+  const input = $(isTasks ? "tasksWithdrawAmount" : "referralWithdrawAmount");
+  const notice = $(isTasks ? "tasksWithdrawNotice" : "referralWithdrawNotice");
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  const amount = Math.round(Number(input.value) * 100);
+  if (!Number.isSafeInteger(amount) || amount <= 0) { notice.textContent = "Enter a valid amount in naira."; return; }
+  button.disabled = true;
+  button.textContent = "Submitting…";
+  try {
+    const { data, error } = await supabaseClient.rpc("request_source_withdrawal", { p_source: source, p_amount_kobo: amount });
+    if (error) throw error;
+    if (!data?.success) throw new Error(data?.message || "Withdrawal request could not be submitted.");
+    notice.textContent = "Your " + source + " withdrawal request has been submitted for manual admin processing.";
+    input.value = "";
+    toast("Withdrawal request submitted.");
+    await loadEarningsSummary();
+  } catch (error) {
+    notice.textContent = error.message || "Unable to submit withdrawal request.";
+    toast(error.message || "Withdrawal request failed.");
+    await loadEarningsSummary();
+  } finally {
+    button.disabled = false;
+    button.textContent = isTasks ? "Request task withdrawal →" : "Request referral withdrawal →";
+  }
+}
+$("tasksWithdrawAmount")?.addEventListener("input", () => updateWithdrawalEligibility("tasks"));
+$("referralWithdrawAmount")?.addEventListener("input", () => updateWithdrawalEligibility("referral"));
+$("tasksWithdrawForm")?.addEventListener("submit", event => submitSourceWithdrawal("tasks", event));
+$("referralWithdrawForm")?.addEventListener("submit", event => submitSourceWithdrawal("referral", event));
+
 async function loadWallet() {
   const { data: userResult } = await supabaseClient.auth.getUser();
   if (!userResult.user) return;
@@ -134,6 +209,7 @@ async function loadWallet() {
   $("balanceAmount").textContent = money(data.available_kobo);
   $("balanceNote").textContent = "Available balance · Pending: " + money(data.pending_kobo);
   if ($("walletBalanceAmount")) { $("walletBalanceAmount").textContent = $("balanceAmount").textContent; $("walletBalanceNote").textContent = $("balanceNote").textContent; }
+  await loadEarningsSummary();
 }
 
 
@@ -307,7 +383,7 @@ function showPage(page){
   document.querySelectorAll(".nav-item").forEach(el=>el.classList.toggle("active",el.dataset.page===target));
   window.scrollTo({top:0,behavior:"smooth"});
   if(target==="invite") loadReferralSummary();
-  if(target==="wallet"){loadWallet();loadSavedBankDetails();}
+  if(target==="wallet"){loadWallet();loadSavedBankDetails();loadEarningsSummary();}
 }
 document.querySelectorAll("[data-page]").forEach(button=>{
   button.addEventListener("click",event=>{
