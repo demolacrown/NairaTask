@@ -1,10 +1,220 @@
-const CONFIG={supabaseUrl:"https://qezdxvyndsudckmreqlk.supabase.co",supabaseAnonKey:"sb_publishable_YpR1Ru2j1QpkcPggrw1fMQ_ZB2df16w",telegramVerifyUrl:"https://qezdxvyndsudckmreqlk.supabase.co/functions/v1/telegram-verify"};
-const $=id=>document.getElementById(id);let telegramUser=null;
-function toast(message){const el=$("toast");el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),2600)}
-function showApp(){$("splash").classList.add("hidden");$("app").classList.remove("hidden")}
-function setUser(user){telegramUser=user;const name=user.first_name||user.username||"there";$("userName").textContent=name;$("welcomeMessage").textContent=user.username?"@"+user.username+" · Complete tasks. Earn rewards.":"Complete tasks. Earn rewards.";$("avatar").textContent=(name.trim()[0]||"N").toUpperCase();if(user.photo_url){const img=document.createElement("img");img.src=user.photo_url;img.alt="Profile";img.referrerPolicy="no-referrer";img.onerror=()=>{img.remove();$("avatar").textContent=(name[0]||"N").toUpperCase()};$("avatar").replaceChildren(img)}}
-async function verifyTelegram(){const tg=window.Telegram&&window.Telegram.WebApp;if(!tg||!tg.initData){$("setupNotice").querySelector("b").textContent="Open through Telegram";$("setupNotice").querySelector("p").textContent="Launch NairaTask from its Telegram bot to verify your identity and load your account.";setUser({first_name:"there"});return}tg.ready();tg.expand();try{const response=await fetch(CONFIG.telegramVerifyUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({initData:tg.initData})});const result=await response.json();if(!response.ok||!result.verified)throw new Error(result.error||"Telegram verification failed");setUser(result.telegramUser);if(result.sessionExchange==="not_configured"){$("setupNotice").querySelector("b").textContent="Telegram identity verified";$("setupNotice").querySelector("p").textContent="Your Telegram profile is recognized. Secure account sign-in is the next step before wallet balances, promo redemption and reward claims can be enabled."}}catch(error){$("setupNotice").querySelector("b").textContent="Identity verification needs attention";$("setupNotice").querySelector("p").textContent=error.message+" Close and reopen the Mini App from Telegram.";toast(error.message)}}
-async function loadTasks(){const target=$("taskList");try{const url=CONFIG.supabaseUrl+"/rest/v1/tasks?select=id,title,description,category,reward_kobo,destination_url,status&status=eq.published&order=created_at.desc&limit=8";const response=await fetch(url,{headers:{"apikey":CONFIG.supabaseAnonKey,"Authorization":"Bearer "+CONFIG.supabaseAnonKey}});if(!response.ok)throw new Error("Tasks could not be loaded");const tasks=await response.json();target.replaceChildren();if(!tasks.length){const empty=document.createElement("div");empty.className="empty-state";empty.textContent="No tasks are available right now. New opportunities will appear here when published.";target.append(empty);return}tasks.forEach(task=>{const card=document.createElement("article");card.className="task-card";const icon=document.createElement("div");icon.className="task-icon";icon.textContent=task.category==="telegram"?"✈":task.category==="whatsapp"?"◉":"↗";const info=document.createElement("div");info.className="task-info";const title=document.createElement("b");title.textContent=task.title;const desc=document.createElement("p");desc.textContent=task.description||"Complete this task and submit your proof.";info.append(title,desc);const reward=document.createElement("span");reward.className="task-reward";reward.textContent="₦"+(Number(task.reward_kobo||0)/100).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});card.append(icon,info,reward);card.addEventListener("click",()=>{if(task.destination_url){const tg=window.Telegram&&window.Telegram.WebApp;if(tg&&tg.openLink)tg.openLink(task.destination_url);else window.open(task.destination_url,"_blank","noopener")}else toast("Task instructions will be available soon.")});target.append(card)})}catch(error){target.innerHTML='<div class="empty-state">Tasks are temporarily unavailable. Please try again later.</div>'}}
-document.querySelectorAll("[data-page]").forEach(button=>button.addEventListener("click",()=>{const page=button.dataset.page;if(page==="home")return window.scrollTo({top:0,behavior:"smooth"});const labels={tasks:"Task listings",invite:"Referral invitations",wallet:"Wallet"};toast((labels[page]||"This section")+" is being connected.")}));
-$("dailyRewardButton").addEventListener("click",()=>toast("Daily reward claims will unlock after secure account sign-in."));$("promoButton").addEventListener("click",()=>toast("Promo redemption will unlock after secure account sign-in."));$("notificationsButton").addEventListener("click",()=>toast("You're all caught up."));$("promoInput").addEventListener("input",event=>{$("promoButton").disabled=!event.target.value.trim()});
-(async function init(){const tg=window.Telegram&&window.Telegram.WebApp;if(tg){try{tg.setHeaderColor("#101b2c");tg.setBackgroundColor("#f4f7fb")}catch(_){}}await verifyTelegram();await loadTasks();setTimeout(showApp,450)})();
+const CONFIG = {
+  supabaseUrl: "https://qezdxvyndsudckmreqlk.supabase.co",
+  supabaseKey: "sb_publishable_YpR1Ru2j1QpkcPggrw1fMQ_ZB2df16w",
+  telegramVerifyUrl: "https://qezdxvyndsudckmreqlk.supabase.co/functions/v1/telegram-verify"
+};
+
+const $ = (id) => document.getElementById(id);
+const headers = {
+  apikey: CONFIG.supabaseKey,
+  Authorization: "Bearer " + CONFIG.supabaseKey
+};
+
+function toast(message) {
+  const el = $("toast");
+  el.textContent = message;
+  el.classList.add("show");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => el.classList.remove("show"), 2800);
+}
+
+function showApp() {
+  $("splash").classList.add("hidden");
+  $("app").classList.remove("hidden");
+}
+
+function setUser(user) {
+  const name = user.first_name || user.username || "there";
+  $("userName").textContent = name;
+  $("welcomeMessage").textContent = user.username
+    ? "@" + user.username + " · Complete tasks. Earn rewards."
+    : "Complete tasks. Earn rewards.";
+  $("avatar").textContent = (name.trim()[0] || "N").toUpperCase();
+
+  if (user.photo_url) {
+    const img = document.createElement("img");
+    img.src = user.photo_url;
+    img.alt = "Profile";
+    img.referrerPolicy = "no-referrer";
+    img.onerror = () => {
+      img.remove();
+      $("avatar").textContent = (name[0] || "N").toUpperCase();
+    };
+    $("avatar").replaceChildren(img);
+  }
+}
+
+function setNotice(title, message) {
+  $("setupNotice").querySelector("b").textContent = title;
+  $("setupNotice").querySelector("p").textContent = message;
+}
+
+async function verifyTelegram() {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (!tg || !tg.initData) {
+    setUser({ first_name: "there" });
+    setNotice(
+      "Open through Telegram",
+      "Launch NairaTask from its Telegram bot to verify your identity."
+    );
+    return;
+  }
+
+  tg.ready();
+  tg.expand();
+
+  try {
+    const response = await fetch(CONFIG.telegramVerifyUrl, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ initData: tg.initData })
+    });
+    const result = await response.json();
+
+    if (!response.ok || !result.verified) {
+      throw new Error(result.error || "Telegram verification failed.");
+    }
+
+    setUser(result.telegramUser);
+
+    if (result.sessionExchange === "not_configured") {
+      setNotice(
+        "Telegram identity verified",
+        "Your Telegram profile is verified. Secure account sessions are not connected yet, so wallet balances, task submissions, promo redemption and reward claims remain locked."
+      );
+    }
+  } catch (error) {
+    setNotice(
+      "Identity verification needs attention",
+      error.message + " Close and reopen the Mini App from Telegram."
+    );
+  }
+}
+
+function renderEmptyTasks(message) {
+  const target = $("taskList");
+  const empty = document.createElement("div");
+  empty.className = "empty-state";
+  empty.textContent = message;
+  target.replaceChildren(empty);
+}
+
+async function loadTasks() {
+  const target = $("taskList");
+  try {
+    const query = new URLSearchParams({
+      select: "id,title,description,category,reward_kobo,destination_url,proof_type,proof_instructions,status,starts_at,ends_at",
+      status: "eq.published",
+      order: "created_at.desc",
+      limit: "12"
+    });
+    const response = await fetch(
+      CONFIG.supabaseUrl + "/rest/v1/tasks?" + query.toString(),
+      { headers }
+    );
+
+    if (!response.ok) {
+      throw new Error("Task service returned " + response.status);
+    }
+
+    const tasks = await response.json();
+    target.replaceChildren();
+
+    if (!tasks.length) {
+      renderEmptyTasks("No tasks have been published yet. New tasks will appear here when the administrator publishes them.");
+      return;
+    }
+
+    for (const task of tasks) {
+      const card = document.createElement("article");
+      card.className = "task-card";
+
+      const icon = document.createElement("div");
+      icon.className = "task-icon";
+      const icons = {
+        telegram: "✈",
+        whatsapp: "◉",
+        rewarded_ad: "▶",
+        instant_link: "↗",
+        sponsor: "★"
+      };
+      icon.textContent = icons[task.category] || "↗";
+
+      const info = document.createElement("div");
+      info.className = "task-info";
+      const title = document.createElement("b");
+      title.textContent = task.title;
+      const description = document.createElement("p");
+      description.textContent = task.description || "Open for task instructions.";
+      info.append(title, description);
+
+      const reward = document.createElement("span");
+      reward.className = "task-reward";
+      reward.textContent = "₦" + (Number(task.reward_kobo || 0) / 100).toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+
+      card.append(icon, info, reward);
+      card.addEventListener("click", () => {
+        if (task.destination_url) {
+          const tg = window.Telegram && window.Telegram.WebApp;
+          if (tg && typeof tg.openLink === "function") {
+            tg.openLink(task.destination_url);
+          } else {
+            window.open(task.destination_url, "_blank", "noopener,noreferrer");
+          }
+        } else {
+          toast(task.proof_instructions || "Task instructions have not been added yet.");
+        }
+      });
+      target.append(card);
+    }
+  } catch (error) {
+    renderEmptyTasks("Tasks are temporarily unavailable. Please try again later.");
+    console.error("NairaTask task loading:", error);
+  }
+}
+
+document.querySelectorAll("[data-page]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const page = button.dataset.page;
+    if (page === "home") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    const messages = {
+      tasks: "The published task list is shown on your Homepage.",
+      invite: "Referral accounts are not connected yet.",
+      wallet: "Wallet access will unlock after secure account sessions are implemented."
+    };
+    toast(messages[page] || "This section is not available yet.");
+  });
+});
+
+$("dailyRewardButton").addEventListener("click", () => {
+  toast("Daily reward claims are locked until secure account sessions are connected.");
+});
+$("promoButton").addEventListener("click", () => {
+  toast("Promo redemption is locked until secure account sessions are connected.");
+});
+$("notificationsButton").addEventListener("click", () => {
+  toast("You're all caught up.");
+});
+$("promoInput").addEventListener("input", (event) => {
+  $("promoButton").disabled = !event.target.value.trim();
+});
+
+(async function init() {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) {
+    try {
+      tg.setHeaderColor("#101b2c");
+      tg.setBackgroundColor("#f4f7fb");
+    } catch (_) {}
+  }
+
+  await verifyTelegram();
+  await loadTasks();
+  setTimeout(showApp, 450);
+})();
