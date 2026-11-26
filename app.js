@@ -4,6 +4,61 @@ const CONFIG = {
   telegramVerifyUrl: "https://qezdxvyndsudckmreqlk.supabase.co/functions/v1/telegram-verify"
 };
 
+
+// Adsun integration is prepared in test mode. No ad block is activated until an
+// approved placement ID is configured from the Adsun publisher workspace.
+const ADSUN_DEBUG_MODE = true;
+let adsunSdkPromise = null;
+const adsunControllers = new Map();
+
+function loadAdsunSdk() {
+  if (window.Adsun) return Promise.resolve(window.Adsun);
+  if (adsunSdkPromise) return adsunSdkPromise;
+  adsunSdkPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://api.adsun.io/sdk.js";
+    script.async = true;
+    script.onload = () => window.Adsun
+      ? resolve(window.Adsun)
+      : reject(new Error("Adsun SDK loaded but did not initialize."));
+    script.onerror = () => reject(new Error("Adsun SDK could not be loaded."));
+    document.head.appendChild(script);
+  });
+  return adsunSdkPromise;
+}
+
+async function showAdsunRewardedAd(blockId) {
+  const placementId = String(blockId || "").trim();
+  if (!/^\\d{1,80}$/.test(placementId)) {
+    throw new Error("Ad placement is not configured yet.");
+  }
+  const ads = await loadAdsunSdk();
+  let controller = adsunControllers.get(placementId);
+  if (!controller) {
+    controller = ads.init({ blockId: placementId, debug: ADSUN_DEBUG_MODE });
+    controller.addEventListener("onReward", async () => {
+      toast("Ad completion verified. Refreshing your wallet…");
+      await loadWallet();
+    });
+    controller.addEventListener("onBannerNotFound", () => {
+      toast("No eligible ad is available right now. Please try again later.");
+    });
+    controller.addEventListener("onNotSuitable", () => {
+      toast("This ad view was not approved. No reward was added.");
+    });
+    controller.addEventListener("onError", () => {
+      toast("The ad could not be played. Please try again later.");
+    });
+    adsunControllers.set(placementId, controller);
+  }
+  return await controller.show();
+}
+
+window.NairaTaskAdsun = Object.freeze({
+  showRewardedAd: showAdsunRewardedAd,
+  debugMode: ADSUN_DEBUG_MODE
+});
+
 const $ = (id) => document.getElementById(id);
 const supabaseClient = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey);
 const headers = {
