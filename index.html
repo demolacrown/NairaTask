@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#101b2c"><meta name="description" content="NairaTask — complete tasks and earn rewards."><title>NairaTask | Earn Rewards</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="./styles.css?v=20261126-4"><script src="https://telegram.org/js/telegram-web-app.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script defer src="./app.js?v=20261126-4"></script></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#101b2c"><meta name="description" content="NairaTask — complete tasks and earn rewards."><title>NairaTask | Earn Rewards</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="./styles.css?v=20261126-5"><script src="https://telegram.org/js/telegram-web-app.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script defer src="./app.js?v=20261126-5"></script></head>
 <body><div id="splash" class="splash" aria-label="Loading NairaTask"><div class="brand-mark">N</div><div class="splash-wordmark">NAIRA<span>TASK</span></div><div class="loader"></div></div>
 <div id="intro" class="intro hidden" aria-label="NairaTask introduction"><div class="intro-orbit orbit-one"></div><div class="intro-orbit orbit-two"></div><div class="intro-content"><div class="brand-mark intro-mark">N</div><div class="intro-wordmark">NAIRA<span>TASK</span></div><p>TASK. TRACK. GROW.</p><div class="intro-line"></div></div></div>
 <main id="app" class="app hidden"><header class="topbar"><a class="brand" href="#" aria-label="NairaTask home"><span class="brand-mark small">N</span><span>NAIRA<b>TASK</b></span></a><div class="top-actions"><a id="adminLink" class="admin-link hidden" href="./admin.html">Admin</a><button class="icon-button" id="notificationsButton" aria-label="Notifications">♧</button></div></header>
@@ -9,7 +9,13 @@
   <div class="section-heading"><div><p class="eyebrow">WITHDRAWAL DETAILS</p><h2>Bank account verification</h2></div></div>
   <p class="muted">Choose your bank and enter your account number. We'll check the registered account name before you submit a withdrawal request.</p>
   <label for="bankSelect">Nigerian bank</label>
-  <select id="bankSelect"><option value="">Loading supported banks…</option></select>
+  <select id="bankSelect">
+    <option value="">Select your bank</option>
+    <option value="100004">OPay</option>
+    <option value="100033">PalmPay</option>
+    <option value="090405">Moniepoint</option>
+    <option value="120003">MoMo PSB</option>
+  </select>
   <label for="accountNumber">10-digit account number</label>
   <input id="accountNumber" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="Enter account number">
   <button class="primary-button" id="verifyBankAccount" type="button" disabled>Verify account name</button>
