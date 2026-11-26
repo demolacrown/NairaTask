@@ -90,6 +90,15 @@ async function verifyTelegram() {
       throw new Error("Secure account session could not be saved. Reopen the Mini App.");
     }
     setUser(result.telegramUser);
+    const startParam = tg.initDataUnsafe?.start_param || "";
+    if (startParam.toLowerCase().startsWith("ref_")) {
+      const referralCode = startParam.slice(4).trim();
+      if (referralCode) {
+        const { data: referralResult } = await supabaseClient.rpc("register_referral", { p_referral_code: referralCode });
+        if (referralResult?.success) toast("Invite code applied successfully.");
+      }
+    }
+    await loadReferralSummary();
     setNotice(
       "Account securely connected",
       "Your Telegram identity is verified and your NairaTask account is signed in."
@@ -125,6 +134,63 @@ async function loadWallet() {
   $("balanceAmount").textContent = money(data.available_kobo);
   $("balanceNote").textContent = "Available balance · Pending: " + money(data.pending_kobo);
 }
+
+
+async function loadReferralSummary() {
+  const { data, error } = await supabaseClient.rpc("get_my_referral_summary");
+  if (error || !data) {
+    $("referralCode").textContent = "Sign in to load";
+    $("referralNotice").textContent = "Open NairaTask through Telegram to load your personal invite code.";
+    return;
+  }
+  $("referralCode").textContent = data.referral_code || "Not available";
+  $("referralTotal").textContent = Number(data.total_invites || 0);
+  $("referralPending").textContent = Number(data.pending_invites || 0);
+  $("referralQualified").textContent = Number(data.qualified_invites || 0);
+  $("referralNotice").textContent = "Reward: ₦100 to the inviter only, after five approved rewarded-ad tasks. Rewards remain pending until ad revenue is verified.";
+}
+
+$("copyReferralCode").addEventListener("click", async () => {
+  const code = $("referralCode").textContent.trim();
+  if (!code || code === "Loading…" || code === "Sign in to load" || code === "Not available") {
+    toast("Your invite code is not ready yet.");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(code);
+    toast("Invite code copied. Share it with your friend.");
+  } catch (_) {
+    toast("Your invite code is " + code);
+  }
+});
+
+$("referralInput").addEventListener("input", () => {
+  $("applyReferral").disabled = !$("referralInput").value.trim();
+});
+$("applyReferral").addEventListener("click", async () => {
+  const button = $("applyReferral");
+  const code = $("referralInput").value.trim().toUpperCase();
+  if (!code) return;
+  button.disabled = true;
+  button.textContent = "Applying…";
+  try {
+    const { data, error } = await supabaseClient.rpc("register_referral", { p_referral_code: code });
+    if (error) throw error;
+    $("referralNotice").textContent = data?.message || "Referral code processed.";
+    if (data?.success) {
+      $("referralInput").value = "";
+      toast("Invite code applied.");
+    } else {
+      toast(data?.message || "Invite code could not be applied.");
+    }
+    await loadReferralSummary();
+  } catch (error) {
+    $("referralNotice").textContent = error.message || "Sign in through Telegram to apply a code.";
+  } finally {
+    button.textContent = "Apply";
+    button.disabled = !$("referralInput").value.trim();
+  }
+});
 
 function renderEmptyTasks(message) {
   const target = $("taskList");
@@ -218,9 +284,13 @@ document.querySelectorAll("[data-page]").forEach((button) => {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+    if (page === "invite") {
+      $("referralPanel").scrollIntoView({ behavior: "smooth", block: "center" });
+      loadReferralSummary();
+      return;
+    }
     const messages = {
       tasks: "The published task list is shown on your Homepage.",
-      invite: "Referral accounts are not connected yet.",
       wallet: "Your available wallet balance is shown above. Full wallet history is coming next."
     };
     toast(messages[page] || "This section is not available yet.");
@@ -293,5 +363,6 @@ $("promoInput").addEventListener("input", (event) => {
 
   await verifyTelegram();
   await loadTasks();
+  await loadReferralSummary();
   setTimeout(playIntro, 350);
 })();
