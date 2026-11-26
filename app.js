@@ -19,8 +19,14 @@ function toast(message) {
 }
 
 function showApp() {
-  $("splash").classList.add("hidden");
+  $("intro").classList.add("hidden");
   $("app").classList.remove("hidden");
+}
+
+function playIntro() {
+  $("splash").classList.add("hidden");
+  $("intro").classList.remove("hidden");
+  setTimeout(showApp, 1500);
 }
 
 function setUser(user) {
@@ -216,5 +222,5 @@ $("promoInput").addEventListener("input", (event) => {
 
   await verifyTelegram();
   await loadTasks();
-  setTimeout(showApp, 450);
+  setTimeout(playIntro, 350);
 })();
