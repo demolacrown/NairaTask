@@ -5,59 +5,70 @@ const CONFIG = {
 };
 
 
-// Adsun integration is prepared in test mode. No ad block is activated until an
-// approved placement ID is configured from the Adsun publisher workspace.
-const ADSUN_DEBUG_MODE = true;
-let adsunSdkPromise = null;
-const adsunControllers = new Map();
-
-function loadAdsunSdk() {
-  if (window.Adsun) return Promise.resolve(window.Adsun);
-  if (adsunSdkPromise) return adsunSdkPromise;
-  adsunSdkPromise = new Promise((resolve, reject) => {
+// Monetag Telegram Mini App integration. Wallet rewards are credited only
+// after a valued impression is confirmed by Monetag's server-side postback.
+let monetagConfig = null;
+let monetagSdkPromise = null;
+let monetagCampaigns = [];
+let dailyRewardCampaignId = null;
+async function loadMonetagConfig() {
+  const { data, error } = await supabaseClient.rpc("get_monetag_public_config");
+  if (error || !data) { monetagConfig = null; return null; }
+  monetagConfig = data; return data;
+}
+async function loadMonetagSdk(config) {
+  const zoneId = String(config?.sdk_zone_id || "").trim();
+  const scriptUrl = String(config?.sdk_script_url || "").trim();
+  if (!/^\\d{1,20}$/.test(zoneId) || !scriptUrl) throw new Error("Monetag's main SDK zone is not configured yet.");
+  const showName = "show_" + zoneId;
+  if (typeof window[showName] === "function") return window[showName];
+  if (monetagSdkPromise) return monetagSdkPromise;
+  monetagSdkPromise = new Promise((resolve, reject) => {
+    let parsed;
+    try { parsed = new URL(scriptUrl); } catch (_) { reject(new Error("Monetag SDK URL is invalid.")); return; }
+    if (parsed.protocol !== "https:" || !parsed.pathname.endsWith("/sdk.js")) { reject(new Error("Use the exact HTTPS SDK URL from your Monetag publisher account.")); return; }
     const script = document.createElement("script");
-    script.src = "https://api.adsun.io/sdk.js";
-    script.async = true;
-    script.onload = () => window.Adsun
-      ? resolve(window.Adsun)
-      : reject(new Error("Adsun SDK loaded but did not initialize."));
-    script.onerror = () => reject(new Error("Adsun SDK could not be loaded."));
+    script.src = scriptUrl; script.async = true;
+    script.dataset.zone = zoneId; script.dataset.sdk = showName; script.dataset.monetagZone = zoneId;
+    script.onload = () => typeof window[showName] === "function" ? resolve(window[showName]) : reject(new Error("Monetag SDK loaded, but its show function was not found. Check the zone ID and generated tag."));
+    script.onerror = () => reject(new Error("Monetag SDK could not be loaded."));
     document.head.appendChild(script);
-  });
-  return adsunSdkPromise;
+  }).catch(error => { monetagSdkPromise = null; throw error; });
+  return monetagSdkPromise;
 }
-
-async function showAdsunRewardedAd(blockId) {
-  const placementId = String(blockId || "").trim();
-  if (!/^\d{1,80}$/.test(placementId)) {
-    throw new Error("Ad placement is not configured yet.");
+async function waitForMonetagReward(ymid) {
+  for (let i = 0; i < 10; i++) {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    const { data, error } = await supabaseClient.rpc("get_monetag_attempt_status", { p_ymid: ymid });
+    if (error || !data?.success) continue;
+    if (data.status === "credited") { await loadWallet(); await loadMonetagCampaigns(); return true; }
+    if (data.status === "rejected") { await loadMonetagCampaigns(); return false; }
   }
-  const ads = await loadAdsunSdk();
-  let controller = adsunControllers.get(placementId);
-  if (!controller) {
-    controller = ads.init({ blockId: placementId, debug: ADSUN_DEBUG_MODE });
-    controller.addEventListener("onReward", async () => {
-      toast("Ad completion verified. Refreshing your wallet…");
-      await loadWallet();
-    });
-    controller.addEventListener("onBannerNotFound", () => {
-      toast("No eligible ad is available right now. Please try again later.");
-    });
-    controller.addEventListener("onNotSuitable", () => {
-      toast("This ad view was not approved. No reward was added.");
-    });
-    controller.addEventListener("onError", () => {
-      toast("The ad could not be played. Please try again later.");
-    });
-    adsunControllers.set(placementId, controller);
-  }
-  return await controller.show();
+  return null;
 }
-
-window.NairaTaskAdsun = Object.freeze({
-  showRewardedAd: showAdsunRewardedAd,
-  debugMode: ADSUN_DEBUG_MODE
-});
+async function showMonetagRewardedAd(campaignId, requestVar = "task_reward") {
+  const config = monetagConfig || await loadMonetagConfig();
+  if (!config || config.provider_key !== "monetag" || config.connection_status !== "connected") throw new Error("Monetag is not connected yet. Please try again later.");
+  const showAd = await loadMonetagSdk(config);
+  const { data: attempt, error: attemptError } = await supabaseClient.rpc("create_monetag_ad_attempt", { p_campaign_id: campaignId });
+  if (attemptError) throw attemptError;
+  if (!attempt?.success || !attempt.ymid) throw new Error(attempt?.message || "A new ad attempt could not be created.");
+  const ymid = attempt.ymid;
+  try {
+    try { await showAd({ type: "preload", ymid, requestVar }); } catch (_) {}
+    await showAd({ ymid, requestVar });
+  } catch (_) {
+    await supabaseClient.rpc("cancel_monetag_ad_attempt", { p_ymid: ymid });
+    throw new Error("The ad could not be completed. No reward was added.");
+  }
+  toast("Ad session finished. Waiting for Monetag's server verification…");
+  const result = await waitForMonetagReward(ymid);
+  if (result === true) { toast("Your verified reward has been added to your wallet."); return true; }
+  if (result === false) { toast("Monetag did not approve this ad for a reward."); return false; }
+  toast("Verification is still pending. Your wallet will update after Monetag confirms the paid impression.");
+  return null;
+}
+window.NairaTaskMonetag = Object.freeze({ showRewardedAd: showMonetagRewardedAd });
 
 const $ = (id) => document.getElementById(id);
 const supabaseClient = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey);
@@ -347,6 +358,44 @@ $("applyReferral").addEventListener("click", async () => {
   }
 });
 
+async function loadMonetagCampaigns() {
+  const root = $("rewardedAdTasks");
+  if (!root) return;
+  const config = await loadMonetagConfig();
+  if (!config || config.connection_status !== "connected") {
+    root.textContent = "Rewarded ad tasks will appear here when Monetag is connected.";
+    dailyRewardCampaignId = null;
+    $("dailyRewardButton").disabled = true;
+    $("dailyRewardButton").textContent = "Daily reward unavailable";
+    return;
+  }
+  const { data, error } = await supabaseClient.rpc("get_monetag_campaigns");
+  if (error) { root.textContent = "Rewarded ads are temporarily unavailable."; dailyRewardCampaignId = null; $("dailyRewardButton").disabled = true; return; }
+  monetagCampaigns = Array.isArray(data) ? data : [];
+  const daily = monetagCampaigns.find(c => c.campaign_type === "daily_reward");
+  dailyRewardCampaignId = daily?.id || null;
+  if (!daily) { $("dailyRewardButton").disabled = true; $("dailyRewardButton").textContent = "Daily reward unavailable"; }
+  else if (Number(daily.completed_today || 0) >= Number(daily.daily_limit || 1)) { $("dailyRewardButton").disabled = true; $("dailyRewardButton").textContent = "Already claimed today"; }
+  else { $("dailyRewardButton").disabled = false; $("dailyRewardButton").textContent = "Watch ad to claim ₦20"; }
+
+  const taskCampaigns = monetagCampaigns.filter(c => c.campaign_type === "task");
+  root.replaceChildren();
+  if (!taskCampaigns.length) { const empty=document.createElement("div");empty.className="empty-state";empty.textContent="No rewarded ad tasks are active right now.";root.append(empty);return; }
+  for (const campaign of taskCampaigns) {
+    const card=document.createElement("article");card.className="task-card";
+    const icon=document.createElement("div");icon.className="task-icon";icon.textContent="▶";
+    const info=document.createElement("div");info.className="task-info";
+    const title=document.createElement("b");title.textContent=campaign.title;
+    const description=document.createElement("p");description.textContent=campaign.description||"Watch a rewarded ad to earn this task reward.";
+    const progress=document.createElement("small");progress.textContent=Number(campaign.completed_today||0)+" of "+Number(campaign.daily_limit||0)+" completed today";
+    info.append(title,description,progress);
+    const action=document.createElement("button");action.className="primary-button";action.type="button";
+    action.textContent="Watch ad · ₦"+(Number(campaign.reward_kobo||0)/100).toLocaleString("en-NG");
+    action.disabled=Number(campaign.completed_today||0)>=Number(campaign.daily_limit||0);
+    action.addEventListener("click",async()=>{action.disabled=true;action.textContent="Loading ad…";try{await showMonetagRewardedAd(campaign.id,"task_reward");}catch(error){toast(error.message||"The ad could not be started.");}finally{await loadMonetagCampaigns();}});
+    card.append(icon,info,action);root.append(card);
+  }
+}
 function renderEmptyTasks(message) {
   const target = $("taskList");
   const empty = document.createElement("div");
@@ -439,6 +488,7 @@ function showPage(page){
   document.querySelectorAll(".nav-item").forEach(el=>el.classList.toggle("active",el.dataset.page===target));
   window.scrollTo({top:0,behavior:"smooth"});
   if(target==="invite") loadReferralSummary();
+  if(target==="tasks") loadMonetagCampaigns();
   if(target==="wallet"){loadWallet();loadSavedBankDetails();loadEarningsSummary();}
 }
 document.querySelectorAll("[data-page]").forEach(button=>{
@@ -500,21 +550,11 @@ $("bankDetailsForm").addEventListener("submit",async event=>{
 
 $("dailyRewardButton").addEventListener("click", async () => {
   const button = $("dailyRewardButton");
-  button.disabled = true;
-  try {
-    const { data, error } = await supabaseClient.rpc("claim_daily_checkin");
-    if (error) throw error;
-    if (!data?.success) {
-      toast(data?.message || "Daily reward could not be claimed.");
-      return;
-    }
-    toast("Daily reward added: ₦" + (Number(data.amount_kobo || 0) / 100).toFixed(2));
-    await loadWallet();
-  } catch (error) {
-    toast(error.message || "Sign in through Telegram to claim your daily reward.");
-  } finally {
-    button.disabled = false;
-  }
+  if (!dailyRewardCampaignId) { toast("The daily rewarded ad is not available right now."); return; }
+  button.disabled = true; button.textContent = "Loading ad…";
+  try { await showMonetagRewardedAd(dailyRewardCampaignId, "daily_checkin"); }
+  catch (error) { toast(error.message || "The daily ad could not be started."); }
+  finally { await loadMonetagCampaigns(); }
 });
 $("promoButton").addEventListener("click", async () => {
   const button = $("promoButton");
@@ -564,6 +604,7 @@ $("promoInput").addEventListener("input", (event) => {
 
   await verifyTelegram();
   await loadTasks();
+  await loadMonetagCampaigns();
   await loadReferralSummary();
   $("walletBalanceAmount").textContent=$("balanceAmount").textContent;
   $("walletBalanceNote").textContent=$("balanceNote").textContent;
