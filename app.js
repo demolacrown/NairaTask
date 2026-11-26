@@ -227,11 +227,53 @@ document.querySelectorAll("[data-page]").forEach((button) => {
   });
 });
 
-$("dailyRewardButton").addEventListener("click", () => {
-  toast("Daily reward claiming is the next feature being connected.");
+$("dailyRewardButton").addEventListener("click", async () => {
+  const button = $("dailyRewardButton");
+  button.disabled = true;
+  try {
+    const { data, error } = await supabaseClient.rpc("claim_daily_checkin");
+    if (error) throw error;
+    if (!data?.success) {
+      toast(data?.message || "Daily reward could not be claimed.");
+      return;
+    }
+    toast("Daily reward added: ₦" + (Number(data.amount_kobo || 0) / 100).toFixed(2));
+    await loadWallet();
+  } catch (error) {
+    toast(error.message || "Sign in through Telegram to claim your daily reward.");
+  } finally {
+    button.disabled = false;
+  }
 });
-$("promoButton").addEventListener("click", () => {
-  toast("Promo code redemption is being connected.");
+$("promoButton").addEventListener("click", async () => {
+  const button = $("promoButton");
+  const code = $("promoInput").value.trim().toUpperCase();
+  if (!code) return;
+  button.disabled = true;
+  button.textContent = "Checking…";
+  $("promoNotice").textContent = "Checking your promo code securely…";
+  try {
+    const { data, error } = await supabaseClient.rpc("redeem_promo_code", {
+      p_code: code
+    });
+    if (error) throw error;
+    if (!data?.success) {
+      $("promoNotice").textContent = data?.message || "This promo code could not be redeemed.";
+      toast(data?.message || "Promo code could not be redeemed.");
+      return;
+    }
+    const amount = (Number(data.amount_kobo || 0) / 100).toFixed(2);
+    $("promoInput").value = "";
+    $("promoNotice").textContent = "Success! ₦" + amount + " has been added to your wallet.";
+    toast("Promo redeemed: ₦" + amount);
+    await loadWallet();
+  } catch (error) {
+    $("promoNotice").textContent = "Sign in through Telegram to redeem a promo code.";
+    toast(error.message || "Promo redemption failed. Please try again.");
+  } finally {
+    button.textContent = "Redeem";
+    button.disabled = !$("promoInput").value.trim();
+  }
 });
 $("notificationsButton").addEventListener("click", () => {
   toast("You're all caught up.");
