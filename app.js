@@ -56,7 +56,7 @@ async function showMonetagRewardedAd(campaignId, requestVar = "task_reward") {
   const ymid = attempt.ymid;
   try {
     try { await showAd({ type: "preload", ymid, requestVar }); } catch (_) {}
-    await showAd({ ymid, requestVar });
+    await showAd({ type: "end", ymid, requestVar });
   } catch (_) {
     await supabaseClient.rpc("cancel_monetag_ad_attempt", { p_ymid: ymid });
     throw new Error("The ad could not be completed. No reward was added.");
