@@ -95,6 +95,8 @@ async function verifyTelegram() {
       "Your Telegram identity is verified and your NairaTask account is signed in."
     );
     await loadWallet();
+    const { data: adminAccess } = await supabaseClient.functions.invoke("admin-check");
+    if (adminAccess?.isAdmin) $("adminLink").classList.remove("hidden");
   } catch (error) {
     setNotice(
       "Identity verification needs attention",
