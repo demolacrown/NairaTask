@@ -19,7 +19,7 @@ async function loadMonetagConfig() {
 async function loadMonetagSdk(config) {
   const zoneId = String(config?.sdk_zone_id || "").trim();
   const scriptUrl = String(config?.sdk_script_url || "").trim();
-  if (!/^\\d{1,20}$/.test(zoneId) || !scriptUrl) throw new Error("Monetag's main SDK zone is not configured yet.");
+  if (!/^\d{1,20}$/.test(zoneId) || !scriptUrl) throw new Error("Monetag's main SDK zone is not configured yet.");
   const showName = "show_" + zoneId;
   if (typeof window[showName] === "function") return window[showName];
   if (monetagSdkPromise) return monetagSdkPromise;
