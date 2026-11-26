@@ -352,7 +352,7 @@ async function loadBankOptions() {
 }
 
 $("accountNumber").addEventListener("input", () => {
-  $("accountNumber").value = $("accountNumber").value.replace(/\\D/g, "").slice(0, 10);
+  $("accountNumber").value = $("accountNumber").value.replace(/\D/g, "").slice(0, 10);
   verifiedBankAccount = null;
   $("verifiedAccount").classList.add("hidden");
   $("verifyBankAccount").disabled = !($("bankSelect").value && $("accountNumber").value.length === 10);
@@ -366,7 +366,7 @@ $("verifyBankAccount").addEventListener("click", async () => {
   const button = $("verifyBankAccount");
   const bankCode = $("bankSelect").value;
   const accountNumber = $("accountNumber").value.trim();
-  if (!bankCode || !/^\\d{10}$/.test(accountNumber)) return;
+  if (!bankCode || !/^\d{10}$/.test(accountNumber)) return;
   button.disabled = true;
   button.textContent = "Verifying…";
   $("bankVerifyNotice").textContent = "Checking the account with the bank verification provider…";
