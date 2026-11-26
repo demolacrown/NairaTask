@@ -22,7 +22,8 @@ A database trigger named `on_auth_user_created_nairatask` invokes `public.handle
 - Telegram Mini App identity verification and Supabase session exchange are implemented in the deployed `telegram-verify` Edge Function.
 - Published task list read from `public.tasks`.
 - Wallet balance loading is implemented for signed-in users.
-- Promo redemption, daily reward claims, referral workflows, task submissions and withdrawals are not yet fully implemented.
+- Homepage promo code redemption and daily reward claims are connected to authenticated database functions. A promo code must be active and available to redeem.
+- Referral workflows and task submissions are not yet fully implemented.
 - Withdrawals are disabled in the existing `app_settings.withdrawal_rules` configuration. No payout flow is implemented.
 - The admin interface calls the deployed `admin-check` and `admin-management` functions. An administrator account still needs to be assigned before the console can be used.
 - No fake balances or fabricated task records are shown.
