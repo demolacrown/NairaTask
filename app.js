@@ -17,8 +17,8 @@ async function loadMonetagConfig() {
   monetagConfig = data; return data;
 }
 async function loadMonetagSdk(config) {
-  const zoneId = String(config?.sdk_zone_id || "").trim();
-  const scriptUrl = String(config?.sdk_script_url || "").trim();
+  const zoneId = String(config?.sdk_zone_id || "12359221").trim();
+  const scriptUrl = String(config?.sdk_script_url || "https://libtl.com/sdk.js").trim();
   if (!/^\d{1,20}$/.test(zoneId) || !scriptUrl) throw new Error("Monetag's main SDK zone is not configured yet.");
   const showName = "show_" + zoneId;
   if (typeof window[showName] === "function") return window[showName];
@@ -29,7 +29,7 @@ async function loadMonetagSdk(config) {
     if (parsed.protocol !== "https:" || !parsed.pathname.endsWith("/sdk.js")) { reject(new Error("Use the exact HTTPS SDK URL from your Monetag publisher account.")); return; }
     const script = document.createElement("script");
     script.src = scriptUrl; script.async = true;
-    script.dataset.zone = zoneId; script.dataset.sdk = showName; script.dataset.monetagZone = zoneId;
+    script.dataset.zone = zoneId; script.dataset.sdk = showName;
     script.onload = () => typeof window[showName] === "function" ? resolve(window[showName]) : reject(new Error("Monetag SDK loaded, but its show function was not found. Check the zone ID and generated tag."));
     script.onerror = () => reject(new Error("Monetag SDK could not be loaded."));
     document.head.appendChild(script);
