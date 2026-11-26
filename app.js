@@ -5,6 +5,7 @@ const CONFIG = {
 };
 
 const $ = (id) => document.getElementById(id);
+const supabaseClient = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey);
 const headers = {
   apikey: CONFIG.supabaseKey,
   Authorization: "Bearer " + CONFIG.supabaseKey
@@ -81,20 +82,46 @@ async function verifyTelegram() {
       throw new Error(result.error || "Telegram verification failed.");
     }
 
-    setUser(result.telegramUser);
-
-    if (result.sessionExchange === "not_configured") {
-      setNotice(
-        "Telegram identity verified",
-        "Your Telegram profile is verified. Secure account sessions are not connected yet, so wallet balances, task submissions, promo redemption and reward claims remain locked."
-      );
+    const { data: sessionResult, error: sessionError } = await supabaseClient.auth.setSession({
+      access_token: result.session.access_token,
+      refresh_token: result.session.refresh_token
+    });
+    if (sessionError || !sessionResult.session) {
+      throw new Error("Secure account session could not be saved. Reopen the Mini App.");
     }
+    setUser(result.telegramUser);
+    setNotice(
+      "Account securely connected",
+      "Your Telegram identity is verified and your NairaTask account is signed in."
+    );
+    await loadWallet();
   } catch (error) {
     setNotice(
       "Identity verification needs attention",
       error.message + " Close and reopen the Mini App from Telegram."
     );
   }
+}
+
+async function loadWallet() {
+  const { data: userResult } = await supabaseClient.auth.getUser();
+  if (!userResult.user) return;
+  const { data, error } = await supabaseClient
+    .from("wallets")
+    .select("available_kobo,pending_kobo,lifetime_earned_kobo")
+    .eq("user_id", userResult.user.id)
+    .maybeSingle();
+  if (error || !data) {
+    $("balanceAmount").textContent = "₦ —";
+    $("balanceNote").textContent = "Wallet is being prepared.";
+    return;
+  }
+  const money = (kobo) => "₦" + (Number(kobo || 0) / 100).toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  $("balanceAmount").textContent = money(data.available_kobo);
+  $("balanceNote").textContent = "Available balance · Pending: " + money(data.pending_kobo);
 }
 
 function renderEmptyTasks(message) {
@@ -192,17 +219,17 @@ document.querySelectorAll("[data-page]").forEach((button) => {
     const messages = {
       tasks: "The published task list is shown on your Homepage.",
       invite: "Referral accounts are not connected yet.",
-      wallet: "Wallet access will unlock after secure account sessions are implemented."
+      wallet: "Your available wallet balance is shown above. Full wallet history is coming next."
     };
     toast(messages[page] || "This section is not available yet.");
   });
 });
 
 $("dailyRewardButton").addEventListener("click", () => {
-  toast("Daily reward claims are locked until secure account sessions are connected.");
+  toast("Daily reward claiming is the next feature being connected.");
 });
 $("promoButton").addEventListener("click", () => {
-  toast("Promo redemption is locked until secure account sessions are connected.");
+  toast("Promo code redemption is being connected.");
 });
 $("notificationsButton").addEventListener("click", () => {
   toast("You're all caught up.");
