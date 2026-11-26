@@ -370,7 +370,12 @@ async function loadMonetagCampaigns() {
     return;
   }
   const { data, error } = await supabaseClient.rpc("get_monetag_campaigns");
-  if (error) { root.textContent = "Rewarded ads are temporarily unavailable."; dailyRewardCampaignId = null; $("dailyRewardButton").disabled = true; return; }
+  if (error) {
+    root.textContent = "Rewarded ads are temporarily unavailable.";
+    dailyRewardCampaignId = null;
+    $("dailyRewardButton").disabled = true;
+    return;
+  }
   monetagCampaigns = Array.isArray(data) ? data : [];
   const daily = monetagCampaigns.find(c => c.campaign_type === "daily_reward");
   dailyRewardCampaignId = daily?.id || null;
@@ -378,23 +383,63 @@ async function loadMonetagCampaigns() {
   else if (Number(daily.completed_today || 0) >= Number(daily.daily_limit || 1)) { $("dailyRewardButton").disabled = true; $("dailyRewardButton").textContent = "Already claimed today"; }
   else { $("dailyRewardButton").disabled = false; $("dailyRewardButton").textContent = "Watch ad to claim ₦20"; }
 
-  const taskCampaigns = monetagCampaigns.filter(c => c.campaign_type === "task");
+  const taskCampaign = monetagCampaigns.find(c => c.campaign_type === "task");
   root.replaceChildren();
-  if (!taskCampaigns.length) { const empty=document.createElement("div");empty.className="empty-state";empty.textContent="No rewarded ad tasks are active right now.";root.append(empty);return; }
-  for (const campaign of taskCampaigns) {
-    const card=document.createElement("article");card.className="task-card";
-    const icon=document.createElement("div");icon.className="task-icon";icon.textContent="▶";
-    const info=document.createElement("div");info.className="task-info";
-    const title=document.createElement("b");title.textContent=campaign.title;
-    const description=document.createElement("p");description.textContent=campaign.description||"Watch a rewarded ad to earn this task reward.";
-    const progress=document.createElement("small");progress.textContent=Number(campaign.completed_today||0)+" of "+Number(campaign.daily_limit||0)+" completed today";
-    info.append(title,description,progress);
-    const action=document.createElement("button");action.className="primary-button";action.type="button";
-    action.textContent="Watch ad · ₦"+(Number(campaign.reward_kobo||0)/100).toLocaleString("en-NG");
-    action.disabled=Number(campaign.completed_today||0)>=Number(campaign.daily_limit||0);
-    action.addEventListener("click",async()=>{action.disabled=true;action.textContent="Loading ad…";try{await showMonetagRewardedAd(campaign.id,"task_reward");}catch(error){toast(error.message||"The ad could not be started.");}finally{await loadMonetagCampaigns();}});
-    card.append(icon,info,action);root.append(card);
+  if (!taskCampaign) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "No rewarded ad tasks are active right now.";
+    root.append(empty);
+    return;
   }
+
+  const completed = Math.min(5, Math.max(0, Number(taskCampaign.completed_today || 0)));
+  const limit = Math.min(5, Math.max(1, Number(taskCampaign.daily_limit || 5)));
+  const reward = (Number(taskCampaign.reward_kobo || 0) / 100).toLocaleString("en-NG");
+  const stack = document.createElement("div");
+  stack.className = "rewarded-task-stack";
+  const heading = document.createElement("div");
+  heading.className = "rewarded-task-progress";
+  heading.textContent = completed + " of " + limit + " ad tasks completed today";
+  stack.append(heading);
+
+  for (let i = 0; i < limit; i++) {
+    const isDone = i < completed;
+    const isNext = i === completed;
+    const card = document.createElement("article");
+    card.className = "task-card rewarded-task-card" + (isDone ? " is-done" : isNext ? " is-next" : " is-locked");
+    const icon = document.createElement("div");
+    icon.className = "task-icon rewarded-task-icon";
+    icon.textContent = isDone ? "✓" : String(i + 1);
+    const info = document.createElement("div");
+    info.className = "task-info";
+    const title = document.createElement("b");
+    title.textContent = "Ad task " + (i + 1);
+    const description = document.createElement("p");
+    description.textContent = isDone ? "Reward confirmed for today." : isNext ? "Watch one rewarded ad to earn ₦" + reward + "." : "Complete the previous ad task to unlock this one.";
+    info.append(title, description);
+    const action = document.createElement("button");
+    action.className = "primary-button rewarded-task-action";
+    action.type = "button";
+    action.textContent = isDone ? "Done ✓" : isNext ? "Watch · ₦" + reward : "Locked";
+    action.disabled = !isNext;
+    if (isNext) {
+      action.addEventListener("click", async () => {
+        action.disabled = true;
+        action.textContent = "Loading…";
+        try {
+          await showMonetagRewardedAd(taskCampaign.id, "task_reward");
+        } catch (error) {
+          toast(error.message || "The ad could not be started.");
+        } finally {
+          await loadMonetagCampaigns();
+        }
+      });
+    }
+    card.append(icon, info, action);
+    stack.append(card);
+  }
+  root.append(stack);
 }
 function renderEmptyTasks(message) {
   const target = $("taskList");
