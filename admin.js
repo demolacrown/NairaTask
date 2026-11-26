@@ -18,7 +18,13 @@ async function loadBankDetails(){
   const meta=document.createElement("small");meta.textContent=(item.profile?.username?"@"+item.profile.username+" · ":"")+ "Telegram ID: "+(item.profile?.telegram_id||"—");
   const bank=document.createElement("small");bank.textContent=item.bank_name+" · "+item.account_name+" · "+item.account_number;
   const status=document.createElement("small");status.textContent="Status: "+item.review_status+" · Submitted: "+new Date(item.submitted_at).toLocaleString();
-  main.append(title,meta,bank,status);row.append(main);root.append(row);
+  main.append(title,meta,bank,status);row.append(main);
+  if(item.review_status!=="reviewed"){
+   const review=document.createElement("button");review.className="ghost";review.textContent="Mark reviewed";
+   review.addEventListener("click",async()=>{review.disabled=true;try{await invoke({action:"mark_bank_details_reviewed",user_id:item.user_id});toast("Bank details marked as reviewed.");await loadBankDetails();}catch(e){toast(e.message);review.disabled=false;}});
+   row.append(review);
+  }
+  root.append(row);
  }
 }
 async function start(){try{const {data:{session}}=await db.auth.getSession();if(!session){throw new Error("No signed-in session. Open NairaTask through Telegram first.")}const access=await db.functions.invoke("admin-check");if(access.error)throw new Error(access.data?.error||"Could not verify administrator access.");if(!access.data?.isAdmin){throw new Error("Your NairaTask account is not yet registered as an administrator.")}$("loading").classList.add("hidden");$("console").classList.remove("hidden");await loadTasks();await loadBankDetails()}catch(e){$("loading").classList.add("hidden");$("denied").classList.remove("hidden");$("deniedText").textContent=e.message}}
